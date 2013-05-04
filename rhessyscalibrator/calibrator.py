@@ -398,6 +398,14 @@ class RHESSysCalibrator(object):
             if e.errno != errno.EEXIST:
                 raise e
 
+        # Create rhessys/templates directory
+        try:
+            os.makedirs(os.path.join(basedir, "rhessys", "templates"))
+        except OSError as e:
+            # If the directory exists, eat the error
+            if e.errno != errno.EEXIST:
+                raise e
+
         # Create rhessys/bin directory
         try:
             os.makedirs(os.path.join(basedir, "rhessys", "bin"))

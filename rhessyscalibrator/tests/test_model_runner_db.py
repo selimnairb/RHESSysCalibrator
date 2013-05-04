@@ -43,12 +43,12 @@ from rhessyscalibrator.model_runner_db import *
 class TestClusterCalibrator(unittest.TestCase):
 
     def setUp(self):
-        self.calibratorDB = ModelRunnerDB("./test/test.db")
+        self.calibratorDB = ModelRunnerDB("./rhessyscalibrator/tests/data/test.db")
 
     def testSessionAndRunCreationAndUpdate(self):
 
         # Test session creation
-        insertedSessionID = self.calibratorDB.insertSession('user2','proj1','notes1',5000,32,'./test','touch')
+        insertedSessionID = self.calibratorDB.insertSession('user2','proj1','notes1',5000,32,'./rhessyscalibrator/tests/data','touch')
         
         mostRecentSessionID = self.calibratorDB.getMostRecentSessionID()
 
@@ -66,6 +66,7 @@ class TestClusterCalibrator(unittest.TestCase):
                                                     0.21, 0.22,
                                                     0.31, 0.32,
                                                     0.41, 0.42, 0.43,
+                                                    0.51, 0.52,
                                                     "rhessys -w worldfile1 ..",
                                                     "run_12345_worlfile1",
                                                     12345)
@@ -130,6 +131,7 @@ class TestClusterCalibrator(unittest.TestCase):
                                                0.21, 0.22,
                                                0.31, 0.32,
                                                0.41, 0.42, 0.43,
+                                               0.51, 0.52,
                                                "rhessys -w worldfile2 ..",
                                                "run_12346_worlfile2",
                                                12346)
@@ -150,7 +152,7 @@ class TestClusterCalibrator(unittest.TestCase):
         self.assertEqual(fetchedSession.notes, "notes1")
         self.assertEqual(fetchedSession.iterations, 5000)
         self.assertEqual(fetchedSession.processes, 32)
-        self.assertEqual(fetchedSession.basedir, "./test")
+        self.assertEqual(fetchedSession.basedir, "./rhessyscalibrator/tests/data")
         self.assertEqual(fetchedSession.cmd_proto, "touch")
         self.assertEqual(fetchedSession.status, "complete")
         self.assertEqual(fetchedSession.obs_filename, "obsfile.csv")

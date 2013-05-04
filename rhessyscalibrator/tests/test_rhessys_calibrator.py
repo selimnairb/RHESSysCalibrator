@@ -36,20 +36,51 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import unittest
 import os
+import stat
+import subprocess
 from subprocess import *
 import re
 import string
+from shutil import rmtree
+from zipfile import ZipFile
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
 
 class TestClusterCalibrator(unittest.TestCase):
 
-    def setUp(self):
-        self.clusterCalibrator = RHESSysCalibrator()
+    @classmethod
+    def setUpClass(cls):
+        # We zip the test RHESSys mode to be nice to GitHub, unzip it
+        cls.basedir = os.path.abspath('./rhessyscalibrator/tests/data/DR5')
+        basedirZip = "%s.zip" % (cls.basedir,)
+        if not os.access(basedirZip, os.R_OK):
+            raise IOError(errno.EACCES, "Unable to read test RHESSys model zip %s" %
+                      basedirZip)
+        basedirParent = os.path.split(basedirZip)[0]    
+        if not os.access(basedirParent, os.W_OK):
+            raise IOError(errno.EACCES, "Unable to write to test RHESSys model parent dir %s" %
+                          basedirParent)
+        zip = ZipFile(basedirZip, 'r')
+        extractDir = os.path.split(cls.basedir)[0]
+        zip.extractall(path=extractDir)
+            
+        # Build RHESSys
+        currDir = os.getcwd()
+        os.chdir('./rhessyscalibrator/tests/data/DR5/rhessys/src/rhessys')
+        res = subprocess.call('make install RHESSYS_BIN=../../bin', shell=True)
+        # Make sure binary is executable else some tests will fail
+        os.chmod('../../bin/rhessys5.15', stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        os.chdir(currDir)    
+        
+        cls.clusterCalibrator = RHESSysCalibrator()
+    
+    @classmethod
+    def tearDownClass(cls):
+        rmtree(cls.basedir)
 
     def testCreateVerifyDirectoryStructure(self):
-        basedir = ".test"
+        basedir = "./rhessyscalibrator/tests/data/.test"
     
         os.mkdir(basedir)
 
@@ -71,74 +102,72 @@ class TestClusterCalibrator(unittest.TestCase):
         self.assertNotEqual(cmd_proto_str, '')
 
     def testGetRHESSysExecPath(self):
-        basedir = "deadrun_calibrate"
         
         (res, filename, pathToFilename) = \
-            self.clusterCalibrator.getRHESSysExecPath(basedir)
+            self.clusterCalibrator.getRHESSysExecPath(self.basedir)
 
+        self.assertTrue(res)
         if res:
             print("Filename: %s, path of filename: %s", 
                   filename, pathToFilename)
         else:
-            print "no executable found in %s" % basedir
+            print "no executable found in %s" % self.basedir
 
     def testGetTecfilePath(self):
-        basedir = "deadrun_calibrate"
         
         (res, pathToFilename) = \
-            self.clusterCalibrator.getTecfilePath(basedir)
+            self.clusterCalibrator.getTecfilePath(self.basedir)
 
-        if res:
-            print("path of filename: %s", 
-                  pathToFilename)
-        else:
-            print "no tecfile found in %s" % basedir
+        self.assertTrue(res)
+#        if res:
+#            print("path of filename: %s", 
+#                  pathToFilename)
+#        else:
+#            print "no tecfile found in %s" % basedir
 
     def testGetWorldFiles(self):
-        basedir = "deadrun_calibrate"
         
-        worldfiles = self.clusterCalibrator.getWorldfiles(basedir)
+        worldfiles = self.clusterCalibrator.getWorldfiles(self.basedir)
 
-        self.assertTrue("world_dr5_20110426d_10m-v3" in worldfiles)
+        self.assertTrue("world5m_dr5" in worldfiles)
         #self.assertTrue("world_dr6_20110426d_10m-v3" in worldfiles)
 
     def testVerifyFlowTables(self):
-        basedir = "deadrun_calibrate"
         
-        worldfiles = self.clusterCalibrator.getWorldfiles(basedir)
+        worldfiles = self.clusterCalibrator.getWorldfiles(self.basedir)
 
         (res, flowtablePath, worldfilesWithoutFlowTables) = \
-            self.clusterCalibrator.verifyFlowTables(basedir, worldfiles.keys())
+            self.clusterCalibrator.verifyFlowTables(self.basedir, worldfiles.keys())
 
-        if res:
-            print "All worldfiles have flow tables"
-        else:
-            for worldfile in worldfilesWithoutFlowTables:
-                print "%s has no flow table" % worldfile 
+        self.assertTrue(res)
+#        if res:
+#            print "All worldfiles have flow tables"
+#        else:
+#            for worldfile in worldfilesWithoutFlowTables:
+#                print "%s has no flow table" % worldfile 
 
     def testPreProcessCmdProto(self):
-        basedir = "deadrun_calibrate"
 
-        file = open(os.path.join(basedir, "cmd.proto"))
+        file = open(os.path.join(self.basedir, "cmd.proto"))
         cmd_proto = file.read()
         file.close()
 
         # Get rhessys executable
         (res, filename, pathToRHESSys) = \
-            self.clusterCalibrator.getRHESSysExecPath(basedir)
+            self.clusterCalibrator.getRHESSysExecPath(self.basedir)
 
         # Get tecfile
         (res, pathToTecfile) = \
-            self.clusterCalibrator.getTecfilePath(basedir)
+            self.clusterCalibrator.getTecfilePath(self.basedir)
 
-        print "\ncmd_proto: %s" % cmd_proto
+#        print "\ncmd_proto: %s" % cmd_proto
 
         cmd_proto_pre = \
             self.clusterCalibrator.preProcessCmdProto(cmd_proto,
                                                       pathToRHESSys,
                                                       pathToTecfile)
 
-        print "\ncmd_proto_pre: %s\n" % cmd_proto_pre
+#        print "\ncmd_proto_pre: %s\n" % cmd_proto_pre
 
         paramsProto = self.clusterCalibrator.parseCmdProtoForParams(cmd_proto)
         self.assertTrue(paramsProto.s1)
@@ -167,12 +196,12 @@ class TestClusterCalibrator(unittest.TestCase):
         itr_cmd_proto = self.clusterCalibrator.addParametersToCmdProto(\
             cmd_proto_pre, params)
 
-        print "\nitr_cmd_proto: %s\n" % itr_cmd_proto
+#        print "\nitr_cmd_proto: %s\n" % itr_cmd_proto
 
-        worldfiles = self.clusterCalibrator.getWorldfiles(basedir)
+        worldfiles = self.clusterCalibrator.getWorldfiles(self.basedir)
 
         (res, flowtablePath, worldfilesWithoutFlowTables) = \
-            self.clusterCalibrator.verifyFlowTables(basedir, worldfiles.keys())
+            self.clusterCalibrator.verifyFlowTables(self.basedir, worldfiles.keys())
 
         itr = 1
         for worldfile in worldfiles.keys():
@@ -180,24 +209,24 @@ class TestClusterCalibrator(unittest.TestCase):
                 self.clusterCalibrator.addWorldfileAndFlowtableToCmdProto(\
                 itr_cmd_proto, worldfiles[worldfile], flowtablePath[worldfile])
 
-            print "\nraw_cmd_proto: %s\n" % raw_cmd_proto
+#            print "\nraw_cmd_proto: %s\n" % raw_cmd_proto
 
             output_path = \
-                self.clusterCalibrator.createOutputPath(basedir,
+                self.clusterCalibrator.createOutputPath(self.basedir,
                                                           1,
                                                           worldfile,
                                                           itr)
-            print "output path: %s" % output_path
+#            print "output path: %s" % output_path
             
             raw_cmd = \
                 self.clusterCalibrator.getCmdRawForRun(raw_cmd_proto,
                                                        output_path)
-            print "\nraw_cmd: %s\n" % raw_cmd
+#            print "\nraw_cmd: %s\n" % raw_cmd
 
 
     def testLSF_sim(self):
         
-        bsub_cmd = "./src/lsf-sim/bsub.py uname -a"
+        bsub_cmd = "./bin/lsf-sim/bsub.py uname -a"
         # run bsub.py
         bsub_process = Popen(bsub_cmd, shell=True, stdout=PIPE)
         (stdout_str, stderr_str) = bsub_process.communicate()
@@ -212,7 +241,7 @@ class TestClusterCalibrator(unittest.TestCase):
         job_id = match.group(1)
         print "\tjob_id %s" % job_id
         
-        bjobs_cmd = "./src/lsf-sim/bjobs.py -a"
+        bjobs_cmd = "./bin/lsf-sim/bjobs.py -a"
         # run bjobs.py
         bjobs_process = Popen(bjobs_cmd, shell=True, stdout=PIPE)
         (stdout_str, stderr_str) = bjobs_process.communicate()
@@ -230,5 +259,5 @@ class TestClusterCalibrator(unittest.TestCase):
         
         
 
-if __name__ == "__main__":
-    unittest.main()
+#if __name__ == "__main__":
+#    unittest.main()
