@@ -126,6 +126,8 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
                                           job.job_id)
         job.id = insertedRunID
         
+#        print("runJobInSubprocess: __rhessys_base: %s, cwd: %s, target cwd: %s, cmd: %s" % (self.__rhessys_base, os.getcwd(), os.path.abspath( self.basedir ), job.cmd_raw ) )
+        
         # Open model process
         process = Popen(job.cmd_raw, shell=True, stdout=PIPE, stderr=PIPE,
                         cwd=self.__rhessys_base, bufsize=1)
@@ -141,6 +143,7 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
         processOut.write(process_stdout)
         processOut.close()
         
+        processErrFile = None
         if '' != process_stderr:
             # Write stderr to file named: 
             #  ${self.__rhessys_base}/${job.output_path}/${job.job_id}.err
@@ -159,8 +162,11 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
         else:
             # Job failed
             self.db.updateRunEndtime(job.id, datetime.utcnow(), "EXIT")
-            self.logger.critical("Job %s FAILED, output written to %s" % 
-                                 (job.job_id, processErrFile))
+            if processErrFile:
+                self.logger.critical("Job %s FAILED, output written to %s" % 
+                                     (job.job_id, processErrFile))
+            else:
+                self.logger.critical("Job %s FAILED" % (job.job_id,) )
 
     def run(self):
         """ Method to be run in a consumer thread/process to launch a run

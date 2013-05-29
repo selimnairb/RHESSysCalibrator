@@ -68,6 +68,8 @@ MAX_PROCESSORS = 512
 
 FILE_READ_BUFF_SIZE = 4096
 
+DEFAULT_FLOWTABLE_SUFFIX = '_flow_table.dat'
+
 class RHESSysCalibrator(object):
 
     _dbPath = None
@@ -293,6 +295,7 @@ class RHESSysCalibrator(object):
         """
         template = Template(cmd_proto)
 
+#        print("preProcessCmdProto: rhessys exec: %s" % (rhessys) )
         return template.safe_substitute(rhessys=rhessys, tecfile=tecfile)
              
     def addParametersToCmdProto(self, cmd_proto, params):
@@ -531,12 +534,13 @@ class RHESSysCalibrator(object):
                     if os.access(entryPath, os.R_OK):
                         # Exclude redefine worldfiles (i.e. those that end in ".Y%4dM%dD%dH%d")
                         if not self.__worldfileFilterRe.match(entryPath):
+                            worldfiles[entry] = os.path.join('worldfiles', 'active', entry)
                             # Strip $BASEDIR and "rhessys" off of front of worldfile
                             #  path before storing
-                            entryPathElem = entryPath.split(os.sep)
-                            worldfiles[entry] = os.path.join(entryPathElem[2],
-                                                             entryPathElem[3],
-                                                             entryPathElem[4])
+#                            entryPathElem = entryPath.split(os.sep)
+#                            worldfiles[entry] = os.path.join(entryPathElem[2],
+#                                                             entryPathElem[3],
+#                                                             entryPathElem[4])
         return worldfiles
 
 
@@ -559,9 +563,9 @@ class RHESSysCalibrator(object):
         worldfilesWithoutFlowTables = []
         flowTablesOK = True
 
-        flowPath = os.path.join(basedir, "rhessys", "flow")
+        flowPath = os.path.join(basedir, 'rhessys', 'flow')
         for worldfile in worldfiles:
-            flowTmp = worldfile + "_flow_table.dat"
+            flowTmp = worldfile + DEFAULT_FLOWTABLE_SUFFIX
             entryPath = os.path.join(flowPath, flowTmp)
             if os.path.isfile(entryPath):
                 # Test to see if file is readable
@@ -569,11 +573,12 @@ class RHESSysCalibrator(object):
                     raise OSError(errno.EACCES, 
                                   "Flow table %s is not readable" %
                                   entryPath)
+                flowtablePath[worldfile] = os.path.join('flow', flowTmp)
                 # Strip $BASEDIR and "rhessys" off of front of flow table
                 #  path before storing                                      
-                entryPathElem = entryPath.split(os.sep)
-                flowtablePath[worldfile] = os.path.join(entryPathElem[2],
-                                                        entryPathElem[3])
+#                entryPathElem = entryPath.split(os.sep)
+#                flowtablePath[worldfile] = os.path.join(entryPathElem[2],
+#                                                        entryPathElem[3])
             else:
                 flowTablesOK = False
                 worldfilesWithoutFlowTables.append(worldfile)
@@ -595,7 +600,7 @@ class RHESSysCalibrator(object):
         pathToFilename = None
         ret = False
 
-        tecPath = os.path.join(basedir, "rhessys", "tecfiles", "active")
+        tecPath = os.path.join(basedir, 'rhessys', 'tecfiles', 'active')
         for entry in os.listdir(tecPath):
             # Only look at non dot files/dir, even though os.listdir says it will not return these
             if entry[0] != '.':
@@ -604,15 +609,18 @@ class RHESSysCalibrator(object):
                 if os.path.isfile(entryPath):
                     # Test to see if file is readable
                     if os.access(entryPath, os.R_OK):
+                        tecfile = entry
                         # Strip $BASEDIR and "rhessys" off of front of tecfile
                         #  path before storing
-                        entryPathElem = entryPath.split(os.sep)
-                        pathToFilename = os.path.join(entryPathElem[2],
-                                                      entryPathElem[3],
-                                                      entryPathElem[4])
+#                        entryPathElem = entryPath.split(os.sep)
+#                        pathToFilename = os.path.join(entryPathElem[2],
+#                                                      entryPathElem[3],
+#                                                      entryPathElem[4])
                         ret = True
                         break
 
+        if ret:
+            pathToFilename = os.path.join('tecfiles', 'active', tecfile)
         return (ret, pathToFilename)
 
 
@@ -632,7 +640,7 @@ class RHESSysCalibrator(object):
         pathToFilename = None
         ret = False
 
-        binPath = os.path.join(basedir, "rhessys", "bin")
+        binPath = os.path.join(basedir, 'rhessys', 'bin')
         for entry in os.listdir(binPath):
             # Only look at non dot files/dir, even though os.listdir says it will not return these
             if entry[0] != '.':
@@ -642,14 +650,16 @@ class RHESSysCalibrator(object):
                     # Test to see if file is executable
                     if os.access(entryPath, os.X_OK):
                         filename = entry
-                        # Strip $BASEDIR and "rhessys" off of front of executable
-                        #  path before storing
-                        entryPathElem = entryPath.split(os.sep)
-                        pathToFilename = os.path.join(entryPathElem[2],
-                                                      entryPathElem[3])
+#                        # Strip $BASEDIR and "rhessys" off of front of executable
+#                        #  path before storing
+#                        entryPathElem = entryPath.split(os.sep)
+#                        pathToFilename = os.path.join(entryPathElem[2],
+#                                                      entryPathElem[3])
                         ret = True
                         break
 
+        if ret:
+            pathToFilename = os.path.join('bin')
         return (ret, filename, pathToFilename)
 
     
@@ -852,15 +862,16 @@ obs/                       Where you will store observed data to be compared to
             self._initLogger(logging.NOTSET)
 
         if not options.basedir:
-            parser.error("Please specify the basedir for the calibration session")            
+            parser.error("Please specify the basedir for the calibration session")
+        basedir = os.path.abspath(options.basedir)            
 
         # Create/verify directory structure in session directory
         try:
-            self.createVerifyDirectoryStructure(options.basedir)
+            self.createVerifyDirectoryStructure(basedir)
 
             if options.create:
                 # --create option was specified, just exit
-                print "Calibration session directory structure created in %s" % options.basedir
+                print "Calibration session directory structure created in %s" % basedir
                 return 0 # exit normally
         except:
             print "Exception ocurred while creating/verifying directory structure"
@@ -911,7 +922,7 @@ with the calibration session""")
             options.bsub_exclusive_mode = 0;
 
         self.logger.critical("parallel mode: %s" % options.parallel_mode)
-        self.logger.debug("basedir: %s" % options.basedir)
+        self.logger.debug("basedir: %s" % basedir)
         self.logger.debug("user: %s" % options.user)
         self.logger.debug("project: %s" % options.project)
         if None != options.notes:
@@ -946,24 +957,26 @@ with the calibration session""")
             # Make sure we have everything we need to run calibrations
             
             # Get list of worldfiles
-            worldfiles = self.getWorldfiles(options.basedir)
+            worldfiles = self.getWorldfiles(basedir)
             if len(worldfiles) < 1:
                 raise Exception("No worldfiles found")
             self.logger.debug("worldfiles: %s" % worldfiles)
             
             # Get tecfile name
-            (res, tecfilePath) = self.getTecfilePath(options.basedir)
+            (res, tecfilePath) = self.getTecfilePath(basedir)
             if not res:
                 raise Exception("No tecfile found")
             
             # Get RHESSys executable path
             (rhessysExecFound, rhessysExec, rhessysExecPath) = \
-                self.getRHESSysExecPath(options.basedir)
+                self.getRHESSysExecPath(basedir)
             if not rhessysExecFound:
                 raise Exception("RHESSys executable not found")
 
+#            print("calibrator: rhessysExec: %s, rhessysExecPath: %s" % (rhessysExec, rhessysExecPath) )
+
             # Read cmd.proto
-            cmd_proto = self._readCmdProtoFromFile(options.basedir)
+            cmd_proto = self._readCmdProtoFromFile(basedir)
             if None == cmd_proto:
                 raise Exception("cmd.proto file not found")
             elif '' == cmd_proto:
@@ -974,7 +987,7 @@ with the calibration session""")
 
             # Pre-process cmd.proto to add rhessys exec and tecfile path
             cmd_proto_pre = self.preProcessCmdProto(cmd_proto,
-                                                    rhessysExecPath,
+                                                    os.path.join(rhessysExecPath, rhessysExec),
                                                     tecfilePath)
 
             # Check for explicit routing in cmd_proto
@@ -986,7 +999,7 @@ with the calibration session""")
             #   Ensure a flow table exists foreach worldfile
             if explicitRouting:
                 (flowTablesOK, flowtablePath, worldfilesWithoutFlowTables) = \
-                  self.verifyFlowTables(options.basedir, worldfiles.keys())
+                  self.verifyFlowTables(basedir, worldfiles.keys())
                 if not flowTablesOK:
                     for worldfile in worldfilesWithoutFlowTables:
                         self.logger.debug("Worldfile without flow table: %s" %
@@ -995,18 +1008,18 @@ with the calibration session""")
             
 
             self.logger.debug("DB path: %s" % 
-                              RHESSysCalibrator.getDBPath(options.basedir))
+                              RHESSysCalibrator.getDBPath(basedir))
 
             self._calibratorDB = \
                 ModelRunnerDB(RHESSysCalibrator.getDBPath(
-                    options.basedir))
+                    basedir))
 
             # Create session
             self.session = self.createCalibrationSession(options.user, 
                                                          options.project,
                                                          options.iterations,
                                                          options.processes,
-                                                         options.basedir,
+                                                         basedir,
                                                          options.notes)
 
             # Allocate dispatch queue/pipe with of size options.processes
@@ -1016,21 +1029,21 @@ with the calibration session""")
             for i in range(1, num_consumers + 1):
                 # Create CalibrationRunner object (consumer)
                 if "lsf" == options.parallel_mode:
-                    consumer = CalibrationRunnerQueueLSF(options.basedir,
+                    consumer = CalibrationRunnerQueueLSF(basedir,
                                                          self.session.id,
                                                          runQueue,
                                                          options.processes,
-                                                         RHESSysCalibrator.getDBPath(options.basedir),
+                                                         RHESSysCalibrator.getDBPath(basedir),
                                                          options.lsf_queue,
                                                          options.polling_delay,
                                                          run_cmd,
                                                          run_status_cmd,
                                                          self.logger)
                 elif "process" == options.parallel_mode:
-                    consumer = CalibrationRunnerSubprocess(options.basedir,
+                    consumer = CalibrationRunnerSubprocess(basedir,
                                                            self.session.id,
                                                            runQueue,
-                                                           RHESSysCalibrator.getDBPath(options.basedir),
+                                                           RHESSysCalibrator.getDBPath(basedir),
                                                            self.logger)
                 # Create process for consumer
                 proc = multiprocessing.Process(target=consumer.run,
@@ -1068,7 +1081,7 @@ with the calibration session""")
                             itr_cmd_proto, worldfiles[worldfile])
 
                     # Finally, create output_path and generate cmd_raw
-                    run.output_path = self.createOutputPath(options.basedir,
+                    run.output_path = self.createOutputPath(basedir,
                                                             self.session.id,
                                                             worldfile,
                                                             itr)
