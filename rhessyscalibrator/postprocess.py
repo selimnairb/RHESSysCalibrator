@@ -356,9 +356,9 @@ Run "%prog --help" for detailed description of all options
                     
                     # Store fitness parameters for this run
                     calibratorDB.updateRunFitnessResults(run.id,
+                                                         'daily',
                                                          my_nse,
-                                                         my_nse_log,
-                                                         "daily")
+                                                         my_nse_log)
                     runsProcessed = True
 
             if runsProcessed:

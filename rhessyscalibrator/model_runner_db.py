@@ -404,13 +404,15 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
 
         cursor.close()
 
-    def updateRunFitnessResults(self, id, nse, nse_log, 
+    def updateRunFitnessResults(self, id, fitness_period, nse, nse_log, 
                                 pbias=None, rsr=None,
-                                user1=None, user2=None, user3=None,
-                                fitness_period=None):
+                                user1=None, user2=None, user3=None):
         """ Updates fitness results of a model run
 
             @param id Integer representing The ID of the run to update
+            @param fitness_period String indicating time step over which 
+                                      all fitness results were calculated.
+                                      One of: daily, monthly, yearly
             @param nse Double: Nash-Sutcliffe efficiency
             @param nse_log Double: Nash-Sutcliffe efficiency (log)
             @param pbias Double: Percent bias
@@ -418,12 +420,9 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
             @param user1 Double: User-defined run fitness result 
             @param user2 Double: User-defined run fitness result 
             @param user3 Double: User-defined run fitness result 
-            @param fitness_period String indicating time step over which 
-                                      all fitness results were calculated.
-                                      One of: daily, monthly, yearly
         """
         cursor = self._conn.cursor()
-
+        
         cursor.execute("""UPDATE run SET 
 nse=?, nse_log=?, pbias=?, rsr=?, user1=?, user2=?, user3=?, fitness_period=?
 WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, id))
