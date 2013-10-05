@@ -856,8 +856,8 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("--bsub_mem_limit", action="store",
                           type="int", dest="bsub_mem_limit",
-                          default=10485760,
-                          help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 10GB")
+                          default=4,
+                          help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 4GB")
 
         (options, args) = parser.parse_args()
 
@@ -947,7 +947,7 @@ with the calibration session""")
             if options.bsub_exclusive_mode:
                 run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
             else:
-                run_cmd = "bsub"
+                run_cmd = "bsub -n 1,1"
             run_cmd += " -M " + str(options.bsub_mem_limit)
             
             run_status_cmd = "bjobs"
