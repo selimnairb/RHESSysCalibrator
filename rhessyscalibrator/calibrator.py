@@ -81,6 +81,8 @@ class RHESSysCalibrator(object):
     def __init__(self):
         # RE filter used to exclude redefine worldfiles (i.e. those that end in ".Y%4dM%dD%dH%d")
         self.__worldfileFilterRe = re.compile("^.*\.Y[0-9]{4}M[1-9][1-2]{0,1}D[1-9][0-9]{0,1}H[0-9][1-4]{0,1}$")
+        # RE filter use to exclude worldfile headers
+        self.__worldfileHeaderFilterRe = re.compile("^.*\.hdr$")
 
 
     ## Define some class methods that are useful for other classes
@@ -533,7 +535,8 @@ class RHESSysCalibrator(object):
                     # Test to see if file is readable
                     if os.access(entryPath, os.R_OK):
                         # Exclude redefine worldfiles (i.e. those that end in ".Y%4dM%dD%dH%d")
-                        if not self.__worldfileFilterRe.match(entryPath):
+                        if not self.__worldfileFilterRe.match(entryPath) \
+                               and not self.__worldfileHeaderFilterRe.match(entryPath):
                             worldfiles[entry] = os.path.join('worldfiles', 'active', entry)
                             # Strip $BASEDIR and "rhessys" off of front of worldfile
                             #  path before storing
