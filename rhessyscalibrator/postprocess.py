@@ -42,6 +42,8 @@ import errno
 from optparse import OptionParser
 import logging
 import string
+from datetime import datetime
+from datetime import timedelta
 
 import math
 import numpy
@@ -53,6 +55,15 @@ from rhessyscalibrator.model_runner_db import *
 class RHESSysCalibratorPostprocess(object):
     """ Main driver class for cluster_calibrator_postprocess tool
     """
+    TIME_STEP_HOURLY = 1
+    TIME_STEP_DAILY = 2
+    TIME_STEPS = [TIME_STEP_HOURLY, TIME_STEP_DAILY]
+    
+    HOUR_HEADER = 'hour'
+    DAY_HEADER = 'day'
+    MONTH_HEADER = 'month'
+    YEAR_HEADER = 'year'
+    
     def __init__(self):
         pass
 
@@ -72,68 +83,126 @@ class RHESSysCalibratorPostprocess(object):
         self.logger.addHandler(consoleHandler)
 
     @classmethod
-    def readObservedDataFromFile(cls, file, header=True):
+    def readObservedDataFromFile(cls, file, header=True, timeStep=TIME_STEP_DAILY):
         """ Reads the data from the observed data file.  Assumes that
-            there is one data point per line.
+            there is one data point per line.  By default a daily timestep
+            is assumed, but hourly is also supported; time step is used for
+            calculating date for each datum.
             
             Arguments:
             file -- file object  The text file to read from
             header -- boolean    Specifies whether a header is present
                                   in the file.  If True, the first
-                                  line of the file will be skipped
+                                  line of the file will read and used to
+                                  determine start date of the timeseries.
+                                  Date is assumed to be in the format:
+                                  "YYYY M D H"
+            timeStep -- string   One of RHESSysCalibratorPostprocess.TIME_STEPS
         
-            Returns a list of floats containing the data from the file.  
-            Returns an empty list if there were no data.
+            Returns tuple (list<datetime.datetime>, list<float>)
+            Returns tuple (empty list, list<float>) if header is false  
+            Returns tuple of empty lists if there were no data.
         """
+        assert(timeStep in RHESSysCalibratorPostprocess.TIME_STEPS)
+        
+        date_list = []
         obs_data = []
+        tmpDate = None
+        delta = None
         
         if header:
-            file.readline()
+            headerData = file.readline().split()
+            tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
+                               int(headerData[2]), int(headerData[3]) )
+            if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_DAILY:
+                delta = timedelta(days=1)
+            else:
+                delta = timedelta(hours=1)
 
         data = file.readline()
         while data:
             obs_data.append(float(data))
+            if header:
+                date_list.append(tmpDate)
+                tmpDate = tmpDate + delta
+            
             data = file.readline()
 
-        return obs_data
+        return (date_list, obs_data)
 
     @classmethod
     def readColumnFromFile(cls, file, column_name, sep=" "):
         """ Reads the specified column from the text file.  The file
-            must have a header.
+            must have a header.  Reads dates/datetime from file by searching
+            for headers with names of 'hour', 'day', 'month', 'year'
         
             Arguments:
             file -- file object  The text file to read from
             column_name -- The name of the column to return
             sep -- The field separator (defaults to " ")
 
-            Returns a list of floats containing the column data.  Returns an
-            empty list if the column had no data, or if the column was
+            Returns tuple (list<datetime.datetime>, list<float>).  
+            Returns tuple of empty lists if the column had no data, or if the column was
             not found
         """
+        date_list = []
         col_data = []
 
         # Read the header line
         header = file.readline()
         headers = string.split(header, sep)
-        col_idx = 0
+        col_idx = -1
+        hour_idx = -1
+        day_idx = -1
+        month_idx = -1
+        year_idx = -1
         col_found = False
         # Find column_name in headers
-        for col in headers:
+        for (counter, col) in enumerate(headers):
             if col == column_name:
+                col_idx = counter
                 col_found = True
-                break
-            col_idx += 1
-
+            elif col == RHESSysCalibratorPostprocess.HOUR_HEADER:
+                hour_idx = counter
+            elif col == RHESSysCalibratorPostprocess.DAY_HEADER:
+                day_idx = counter
+            elif col == RHESSysCalibratorPostprocess.MONTH_HEADER:
+                month_idx = counter
+            elif col == RHESSysCalibratorPostprocess.YEAR_HEADER:
+                year_idx = counter
+            
         # We found column_name, read the data
         if col_found:
             data = file.readline()
             while data:
+                hour = day = month = year = None
                 cols = string.split(data, sep)
+                # Get data
                 col_data.append(float(cols[col_idx]))
+                # Get datetime
+                if hour_idx >= 0:
+                    hour = int(cols[hour_idx])
+                if day_idx >= 0:
+                    day = int(cols[day_idx])
+                if month_idx >= 0:
+                    month = int(cols[month_idx])
+                if year_idx >= 0:
+                    year = int(cols[year_idx])
+                # Construct date object
+                tmpDate = None
+                if hour and day and month and year:
+                    tmpDate = datetime(year, month, day, hour)
+                elif day and month and year:
+                    tmpDate = datetime(year, month, day, 1)
+                elif month and year:
+                    tmpDate = datetime(year, month, 1)
+                elif year:
+                    tmpDate = datetime(year, 12, 31)
+                date_list.append(tmpDate)
+                
                 data = file.readline()
 
-        return col_data
+        return (date_list, col_data)
 
     @classmethod
     def logTransform(cls, list1, list2):
@@ -217,6 +286,10 @@ Run "%prog --help" for detailed description of all options
                           dest="add_streamflow_and_gw",
                           help="[OPTIONAL] Add streamflow and gw.Qout columns instead of using streamflow alone")
 
+        parser.add_option("-d", "--startdate", type="int", nargs=4,
+                          dest="startdate", 
+                          help="[OPTIONAL] Date from which to start fitness calculations, of format YYYY M D H")
+
         parser.add_option("-l", "--loglevel", action="store", type="string",
                           dest="loglevel", default="OFF",
                           help="[OPTIONAL] set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
@@ -259,6 +332,13 @@ Run "%prog --help" for detailed description of all options
 
         rhessysPath = RHESSysCalibrator.getRhessysPath(options.basedir)
 
+        startDate = None
+        if options.startdate:
+            startDate = datetime(options.startdate[0],
+                                 options.startdate[1],
+                                 options.startdate[2],
+                                 options.startdate[3])
+
         try:
             calibratorDB = \
                 ModelRunnerDB(RHESSysCalibrator.getDBPath(
@@ -290,7 +370,7 @@ Run "%prog --help" for detailed description of all options
             
             # Read observed data from file
             obsFile = open(obsFilePath, 'r')
-            obs_data = \
+            (obs_datetime, obs_data) = \
                 RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile)
             obsFile.close()
 
@@ -301,7 +381,7 @@ Run "%prog --help" for detailed description of all options
             for run in runs:
                 if "DONE" == run.status:
                     runOutput = os.path.join(rhessysPath, run.output_path)
-                    self.logger.debug("Output dir of run %d is %s" %
+                    self.logger.debug(">>>\nOutput dir of run %d is %s" %
                                          (run.id, runOutput))
                     tmpOutfile = \
                         RHESSysCalibrator.getRunOutputFilePath(runOutput)
@@ -312,17 +392,21 @@ Run "%prog --help" for detailed description of all options
                     tmpFile = open(tmpOutfile, 'r')
                     
                     if options.add_streamflow_and_gw:
-                        streamflow = \
-                            numpy.array(RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile, "streamflow"))
+                        (model_datetime, model_data) = \
+                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile, "streamflow")
+                        streamflow = numpy.array(model_data)
                         tmpFile.seek(0)
-                        gw_Qout = \
-                            numpy.array(RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile, "gw.Qout"))
+                        
+                        (model_datetime, model_data) = \
+                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile, "gw.Qout")
+                        gw_Qout = numpy.array(model_data)
                         tmpResults = streamflow + gw_Qout
                                                             
                     else:
-                        tmpResults = \
-                            numpy.array(RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
-                                                                            "streamflow"))
+                        (model_datetime, model_data) = \
+                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
+                                                                            "streamflow")
+                        tmpResults = numpy.array(model_data)
                             
                     self.logger.debug("Output file %s: %s" % (tmpOutfile, tmpResults))
                     tmpFile.close()
@@ -330,13 +414,42 @@ Run "%prog --help" for detailed description of all options
                     # Make sure observed and modeled data are of the same
                     #   extent
                     my_obs_data = obs_data
+                    if startDate:
+                        obsStartIdx = -1
+                        modelStartIdx = -1
+                        for (counter, tmpDate) in enumerate(obs_datetime):
+                            if tmpDate.hour == startDate.hour and \
+                                tmpDate.day == startDate.day and \
+                                tmpDate.month == startDate.month and \
+                                tmpDate.year == startDate.year:
+                                obsStartIdx = counter
+                                break
+                        for (counter, tmpDate) in enumerate(model_datetime):
+                            if tmpDate.hour == startDate.hour and \
+                                tmpDate.day == startDate.day and \
+                                tmpDate.month == startDate.month and \
+                                tmpDate.year == startDate.year:
+                                modelStartIdx = counter
+                                break 
+                        
+                        self.logger.debug("Runid: %d" % (run.id,) )    
+                        self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
+                              (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
+                        self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
+                              (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
+                            
+                        if obsStartIdx >= 0:
+                            my_obs_data = obs_data[obsStartIdx:]
+                        if modelStartIdx >= 0:
+                            tmpResults = tmpResults[modelStartIdx:]
+                    
                     if len(obs_data) > len(tmpResults):
                         my_obs_data = obs_data[:len(tmpResults)]
                         #my_log_obs_data = log_obs_data[:len(tmpResults)]
                     elif len(obs_data) < len(tmpResults):
                         tmpResults = tmpResults[:len(obs_data)]
                     assert(len(my_obs_data) == len(tmpResults))
-
+                    
                     # Calculate NSE
                     my_nse = \
                         RHESSysCalibratorPostprocess.calculateNSE(my_obs_data,
@@ -351,7 +464,7 @@ Run "%prog --help" for detailed description of all options
                         RHESSysCalibratorPostprocess.calculateNSE(my_log_obs_data, 
                                                                   log_tmpResults)
 
-                    self.logger.debug("run %s, NSE: %s, NSE-log: %s" %
+                    self.logger.debug("run %s, NSE: %s, NSE-log: %s\n>>>" %
                                       (run.id, my_nse, my_nse_log))
                     
                     # Store fitness parameters for this run
