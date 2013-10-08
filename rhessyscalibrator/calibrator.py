@@ -63,8 +63,8 @@ from rhessyscalibrator.calibration_parameters import *
 LSF_QUEUES = ["day", "debug", "hour", "week", "bigmem"]
 PARALLEL_MODES = ["lsf", "process"]
 
-MAX_ITERATIONS = 5120
-MAX_PROCESSORS = 512
+MAX_ITERATIONS = 10000
+MAX_PROCESSORS = 1024
 
 FILE_READ_BUFF_SIZE = 4096
 
