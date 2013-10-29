@@ -47,6 +47,7 @@ from datetime import timedelta
 
 import math
 import numpy
+import matplotlib.pyplot as plt
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
@@ -64,8 +65,42 @@ class RHESSysCalibratorPostprocess(object):
     MONTH_HEADER = 'month'
     YEAR_HEADER = 'year'
     
+    PARAM_S1_IDX = 0
+    PARAM_S1_NAME = 'm'
+    PARAM_S2_IDX = 1
+    PARAM_S2_NAME = 'lateral Ksat0'
+    PARAM_S3_IDX = 2
+    PARAM_S3_NAME = 'soil depth'
+    PARAM_SV1_IDX = 3
+    PARAM_SV1_NAME = 'vertical m'
+    PARAM_SV2_IDX = 4
+    PARAM_SV2_NAME = 'vertical Ksat0'
+    PARAM_GW1_IDX = 5
+    PARAM_GW1_NAME = 'sat. to GW'
+    PARAM_GW2_IDX = 6
+    PARAM_GW2_NAME = 'GW loss'
+    PARAM_VGSEN1_IDX = 7
+    PARAM_VGSEN1_NAME = 'proj. SLA'
+    PARAM_VGSEN2_IDX = 8
+    PARAM_VGSEN2_NAME = 'shaded SLA'
+    PARAM_VGSEN3_IDX = 9
+    PARAM_VGSEN3_NAME = 'vgsen3'
+    PARAM_SVALT1_IDX = 10
+    PARAM_SVALT1_NAME = 'psi air entry'
+    PARAM_SVALT2_IDX = 11
+    PARAM_SVALT2_NAME = 'pore size index'
+    PARAM_INDICES = (PARAM_S1_IDX, PARAM_S2_IDX,
+                     PARAM_S3_IDX, PARAM_SV1_IDX,
+                     PARAM_SV2_IDX, PARAM_GW1_IDX,
+                     PARAM_GW2_IDX, PARAM_VGSEN1_IDX,
+                     PARAM_VGSEN2_IDX, PARAM_VGSEN3_IDX,
+                     PARAM_SVALT1_IDX, PARAM_SVALT2_IDX)
+    NUM_PARAM_INDICES = len(PARAM_INDICES)
+    
     def __init__(self):
-        pass
+        self.params = set()
+        self.plotData = {}
+        self.plotDataIdx = -1
 
     def _initLogger(self, level):
         """ Setup logger.  Log to the console for now """
@@ -259,6 +294,317 @@ class RHESSysCalibratorPostprocess(object):
         assert(denominator != 0)
         return 1 - (numerator / denominator)
 
+    
+    def _storePerformanceDataForRun(self, run, data, performance):
+        if run.param_s1:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_S1_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 0] = run.param_s1
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 1] = performance
+        if run.param_s2:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_S2_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 0] = run.param_s2
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 1] = performance
+        if run.param_s3:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_S3_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 0] = run.param_s3
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 1] = performance
+        if run.param_sv1:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_SV1_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 0] = run.param_sv1
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 1] = performance
+        if run.param_sv2:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_SV2_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 0] = run.param_sv2
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 1] = performance
+        if run.param_gw1:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_GW1_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 0] = run.param_gw1
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 1] = performance
+        if run.param_gw2:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_GW2_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 0] = run.param_gw2
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 1] = performance
+        if run.param_vgsen1:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_VGSEN1_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN1_IDX, 0] = run.param_vgsen1
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN1_IDX, 1] = performance
+        if run.param_vgsen2:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_VGSEN2_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN2_IDX, 0] = run.param_vgsen2
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN2_IDX, 1] = performance
+        if run.param_vgsen3:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_VGSEN3_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN3_IDX, 0] = run.param_vgsen3
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN3_IDX, 1] = performance
+        if run.param_svalt1:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_SVALT1_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT1_IDX, 0] = run.param_svalt1
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT1_IDX, 1] = performance
+        if run.param_svalt2:
+            self.params.add(RHESSysCalibratorPostprocess.PARAM_SVALT2_IDX)
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT2_IDX, 0] = run.param_svalt2
+            data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT2_IDX, 1] = performance
+    
+    
+    def recordPlotDataForRun(self, run, numRuns, nse, nse_log, pbias=None, rsr=None, 
+                             user1=None, user2=None, user3=None):
+        """
+            @param run rhessyscalibrator.model_runner_db.ModelRun
+        """
+        self.plotDataIdx += 1
+        
+        try:
+            data = self.plotData['nse']
+        except KeyError:
+            data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+            self.plotData['nse'] = data
+        self._storePerformanceDataForRun(run, data, nse)
+        
+        try:
+            data = self.plotData['nse_log']
+        except KeyError:
+            data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+            self.plotData['nse_log'] = data
+        self._storePerformanceDataForRun(run, data, nse_log)
+        
+        if pbias:
+            try:
+                data = self.plotData['pbias']
+            except KeyError:
+                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                self.plotData['pbias'] = data
+            self._storePerformanceDataForRun(run, data, pbias)
+            
+        if rsr:
+            try:
+                data = self.plotData['rsr']
+            except KeyError:
+                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                self.plotData['rsr'] = data
+            self._storePerformanceDataForRun(run, data, rsr)
+            
+        if user1:
+            try:
+                data = self.plotData['user1']
+            except KeyError:
+                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                self.plotData['user1'] = data
+            self._storePerformanceDataForRun(run, data, user1)
+            
+        if user2:
+            try:
+                data = self.plotData['user2']
+            except KeyError:
+                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                self.plotData['user2'] = data
+            self._storePerformanceDataForRun(run, data, user2)
+            
+        if user3:
+            try:
+                data = self.plotData['user3']
+            except KeyError:
+                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                self.plotData['user3'] = data
+            self._storePerformanceDataForRun(run, data, user3)
+    
+    
+    def saveDottyPlot(self, outDir, filename, format='PDF'):
+        """ Save dotty plots showing parameter sensitivity to outDir 
+        """
+        assert( format in ['PDF', 'PNG'] )
+        if format == 'PDF':
+            plotFilename = "%s.pdf" % (filename,)
+        elif format == 'PNG':
+            plotFilename = "%s.png" % (filename,)
+        plotFilepath = os.path.join(outDir, plotFilename)
+        
+        fontsize = 'x-small'
+        
+        numRows = len( self.plotData.keys() )
+        numCols = len( self.params )
+        fig, ax = plt.subplots(nrows=numRows, ncols=numCols, sharey='row', squeeze=False)
+        fig.subplots_adjust(wspace=0.3)
+        
+        if RHESSysCalibratorPostprocess.PARAM_S1_IDX in self.params:
+            a = ax[1, 0]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_S1_NAME, fontsize=fontsize)
+            a.set_ylabel('N-S efficiency for daily streamflow', fontsize='xx-small')
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 6)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 0]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 6)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+                a.set_ylabel('N-S efficiency for log daily streamflow', fontsize='xx-small')
+                
+        if RHESSysCalibratorPostprocess.PARAM_S2_IDX in self.params:
+            a = ax[1, 1]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_S2_NAME, fontsize=fontsize)
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 150)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 1]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 150)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+                
+        if RHESSysCalibratorPostprocess.PARAM_S3_IDX in self.params:
+            a = ax[1, 2]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_S3_NAME, fontsize=fontsize)
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0.5, 2.0)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 2]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0.5, 2.0)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+                
+        if RHESSysCalibratorPostprocess.PARAM_SV1_IDX in self.params:
+            a = ax[1, 3]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_SV1_NAME, fontsize=fontsize)
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 6)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 3]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 6)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+                
+        if RHESSysCalibratorPostprocess.PARAM_SV2_IDX in self.params:
+            a = ax[1, 4]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_SV2_NAME, fontsize=fontsize)
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 150)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 4]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 150)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+                
+        if RHESSysCalibratorPostprocess.PARAM_GW1_IDX in self.params:
+            a = ax[1, 5]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_GW1_NAME, fontsize=fontsize)
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 1)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 5]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 1)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+        
+        if RHESSysCalibratorPostprocess.PARAM_GW2_IDX in self.params:
+            a = ax[1, 6]
+            a.set_xlabel(RHESSysCalibratorPostprocess.PARAM_GW2_NAME, fontsize=fontsize)
+            if 'nse' in self.plotData.keys():
+                data = self.plotData['nse']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 1)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+            if 'nse_log' in self.plotData.keys():
+                a = ax[0, 6]
+                data = self.plotData['nse_log']
+                x = data[:, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 0]
+                y = data[:, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 1]
+                a.locator_params(axis='x', nbins=4)
+                a.tick_params(labelsize=fontsize)
+                a.margins(1)
+                a.set_xlim(0, 1)
+                a.set_ylim(0, 1)
+                a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
+        
+        fig.savefig(plotFilepath, format=format)
+        
+
     def main(self, args):
 
         # Set up command line options
@@ -269,6 +615,10 @@ Run "%prog --help" for detailed description of all options
         parser.add_option("-b", "--basedir", action="store", type="string", 
                           dest="basedir",
                           help="[REQUIRED] base directory for the calibration session")
+        
+        parser.add_option("-o", "--outdir", action="store", type="string",
+                          dest="outdir",
+                          help="[REQUIRED] output directory in which to place dotty plot figures")
 
         parser.add_option("-f", "--file", action="store", type="string",
                           dest="observed_file",
@@ -307,11 +657,18 @@ Run "%prog --help" for detailed description of all options
         if not options.basedir:
             parser.error("Please specify the basedir for the calibration session")
         
+        if not options.outdir:
+            parser.error("Please specify the figure output directory for the calibration session")
+        
         if not options.session_id:
             parser.error("Please specify the ID of session for which you'd like t calculate model fitness statistics")
 
         if not options.observed_file:
             parser.error("Please specify the name of the observed file to use for calculating model fitness statistics")
+
+        if not os.path.isdir(options.outdir) and os.access(options.outdir, os.W_OK):
+            parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
+        outdirPath = os.path.abspath(options.outdir)
 
         dbPath = RHESSysCalibrator.getDBPath(options.basedir)
         if not os.access(dbPath, os.R_OK):
@@ -364,7 +721,8 @@ Run "%prog --help" for detailed description of all options
                 
             # Get runs in session
             runs = calibratorDB.getRunsInSession(session.id)
-            if len(runs) == 0:
+            numRuns = len(runs) 
+            if numRuns == 0:
                 raise Exception("No runs found for session %d" 
                                 % (session.id,))
             
@@ -472,6 +830,10 @@ Run "%prog --help" for detailed description of all options
                                                          'daily',
                                                          my_nse,
                                                          my_nse_log)
+                    
+                    # Store performance parameters for this run so we can plot later
+                    self.recordPlotDataForRun(run, numRuns, my_nse, my_nse_log)
+                    
                     runsProcessed = True
 
             if runsProcessed:
@@ -479,6 +841,10 @@ Run "%prog --help" for detailed description of all options
                 # options.observed_file
                 calibratorDB.updateSessionObservationFilename(session.id,
                                                               options.observed_file)
+                
+                # Generate and save dotty plot
+                dottyFilename = "dotty_plots_SESSION_%s" % ( options.session_id, )
+                self.saveDottyPlot(outdirPath, dottyFilename, format='PNG')
         except:
             raise
         else:
