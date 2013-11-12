@@ -166,13 +166,13 @@ class RHESSysCalibratorPostprocess(object):
         return (date_list, obs_data)
 
     @classmethod
-    def readColumnFromFile(cls, file, column_name, sep=" "):
+    def readColumnFromFile(cls, f, column_name, sep=" "):
         """ Reads the specified column from the text file.  The file
             must have a header.  Reads dates/datetime from file by searching
             for headers with names of 'hour', 'day', 'month', 'year'
         
             Arguments:
-            file -- file object  The text file to read from
+            f -- file object  The text file to read from
             column_name -- The name of the column to return
             sep -- The field separator (defaults to " ")
 
@@ -184,7 +184,7 @@ class RHESSysCalibratorPostprocess(object):
         col_data = []
 
         # Read the header line
-        header = file.readline()
+        header = f.readline()
         headers = string.split(header, sep)
         col_idx = -1
         hour_idx = -1
@@ -208,7 +208,7 @@ class RHESSysCalibratorPostprocess(object):
             
         # We found column_name, read the data
         if col_found:
-            data = file.readline()
+            data = f.readline()
             while data:
                 hour = day = month = year = None
                 cols = string.split(data, sep)
@@ -235,7 +235,7 @@ class RHESSysCalibratorPostprocess(object):
                     tmpDate = datetime(year, 12, 31)
                 date_list.append(tmpDate)
                 
-                data = file.readline()
+                data = f.readline()
 
         return (date_list, col_data)
 
