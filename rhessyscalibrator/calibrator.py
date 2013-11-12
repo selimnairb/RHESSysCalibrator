@@ -69,6 +69,7 @@ MAX_PROCESSORS = 1024
 FILE_READ_BUFF_SIZE = 4096
 
 DEFAULT_FLOWTABLE_SUFFIX = '_flow_table.dat'
+SURFACE_FLOWTABLE_SUFFIX = '_surface_flow_table.dat'
 
 class RHESSysCalibrator(object):
 
@@ -176,13 +177,17 @@ class RHESSysCalibrator(object):
         self.logger.addHandler(consoleHandler)
         
 
-    def _generateCmdProto(self):
+    def _generateCmdProto(self, surface=False):
         """ Generates a cmd.proto string to be written to a file.
 
+            @param surface True if surface flowtable template variable is to be generated
             @return String representing the prototype command
         """
         #cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2 -vgsen $vgsen1 $vgsen2 $vgsen3 -svalt $svalt1 $svalt2"""
-        cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+        if surface:
+            cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable $surface_flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+        else:
+            cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
         
         return cmd_proto
 
@@ -317,13 +322,14 @@ class RHESSysCalibrator(object):
 
 
     def addWorldfileAndFlowtableToCmdProto(self, cmd_proto,
-                                           worldfile, flowtable):
+                                           worldfile, flowtable, surface_flowtable=None):
         """ Add items specific to a particular run to cmd.proto, these
             items include: worldfile, flowtable
 
             @param cmd_proto String representing the contents of the cmd.proto to add to
             @param worldfile String represetning the path of the worldfile
-            @flowtable String representing the path of the flowtable
+            @param flowtable String representing the path of the flowtable
+            @param surface_flowtable String representing path of the surface flowtable
 
             @return String representing the cmd.proto with run-specific
             items substituted to it; a.k.a. the raw command suitable for
@@ -332,8 +338,13 @@ class RHESSysCalibrator(object):
             @raise KeyError on error.
         """
         template = Template(cmd_proto)
-        return template.safe_substitute(worldfile=worldfile, 
-                                        flowtable=flowtable)
+        if surface_flowtable is not None:
+            return template.safe_substitute(worldfile=worldfile, 
+                                            flowtable=flowtable,
+                                            surface_flowtable=surface_flowtable)
+        else:
+            return template.safe_substitute(worldfile=worldfile, 
+                                            flowtable=flowtable)
         
     def addWorldfileToCmdProto(self, cmd_proto, worldfile):
         """ Add items specific to a particular run to cmd.proto, these
@@ -547,23 +558,29 @@ class RHESSysCalibrator(object):
         return worldfiles
 
 
-    def verifyFlowTables(self, basedir, worldfiles):
+    def verifyFlowTables(self, basedir, worldfiles, surfaceFlowtable=False):
         """ Ensure that one flow table exists in $BASEDIR/rhessys/flow 
             for each worldfile in the list provided.  Assumes flow tables
             are named $WORLDFILE_flow_table.dat
 
             @param basedir String representing the basedir from which to read flow tables
             @param worldfiles List of strings representing worldfile names
+            @param surfaceFlowtable True if surface flowtable is to be used
         
-            @return Tuple: (True, {}, []) or (False, {}, []), where
-            {} is a dictionary mapping worldfile name to flowtable
-            path, and [] is a list of worldfiles without flow tables,
-            which will be empty if True. Flowtable path will be relative to $BASEDIR/rhessys
+            @return Tuple: (True, {}, {}, [], []) or (False, {}, {}, [], []), where
+            the first {} is a dictionary mapping worldfile name to flowtable
+            path, the second {} is a dictionary mapping worldfile name to surface
+            flow table path, the first [] is a list of worldfiles without flow tables, and
+            the second [] is a list of worldfiles without surface flowtables; the lists
+            will be empty if first tuple element is True.  The second dict and list will be empty if
+            surfaceFlowtable is False.  Flowtable paths will be relative to $BASEDIR/rhessys
 
             @raise OSError if a flow table file is not readable
         """
-        flowtablePath = dict()
+        flowtablePath = {}
+        surfaceFlowtablePath = {}
         worldfilesWithoutFlowTables = []
+        worldfilesWithoutSurfaceFlowTables = []
         flowTablesOK = True
 
         flowPath = os.path.join(basedir, 'rhessys', 'flow')
@@ -577,16 +594,25 @@ class RHESSysCalibrator(object):
                                   "Flow table %s is not readable" %
                                   entryPath)
                 flowtablePath[worldfile] = os.path.join('flow', flowTmp)
-                # Strip $BASEDIR and "rhessys" off of front of flow table
-                #  path before storing                                      
-#                entryPathElem = entryPath.split(os.sep)
-#                flowtablePath[worldfile] = os.path.join(entryPathElem[2],
-#                                                        entryPathElem[3])
             else:
                 flowTablesOK = False
                 worldfilesWithoutFlowTables.append(worldfile)
+            # Check for surface flow tables (if applicable)
+            if surfaceFlowtable:
+                flowTmp = worldfile + SURFACE_FLOWTABLE_SUFFIX
+                entryPath = os.path.join(flowPath, flowTmp)
+                if os.path.isfile(entryPath):
+                # Test to see if file is readable
+                    if not os.access(entryPath, os.R_OK):
+                        raise OSError(errno.EACCES, 
+                                      "Surface flow table %s is not readable" %
+                                      entryPath)
+                    surfaceFlowtablePath[worldfile] = os.path.join('flow', flowTmp)
+                else:
+                    flowTablesOK = False
+                    worldfilesWithoutSurfaceFlowTables.append(worldfile)
 
-        return (flowTablesOK, flowtablePath, worldfilesWithoutFlowTables)
+        return (flowTablesOK, flowtablePath, surfaceFlowtablePath, worldfilesWithoutFlowTables, worldfilesWithoutSurfaceFlowTables)
 
 
     def getTecfilePath(self, basedir):
@@ -779,8 +805,9 @@ rhessys/worldfiles/active/ Where you will place world files for which
                             in this directory will be calibrated as part of the
                             session)
 rhessys/flow/              Where you will place flow tables associated with
-                            each worldfile to be calibrated. Flow table file name must be 
-                            of the form $(WORLDFILE_NAME)_flow_table.dat
+                            each worldfile to be calibrated. Flow table filename must be 
+                            of the form $(WORLDFILE_NAME)_flow_table.dat. Surface flow table
+                            filename must be of the form $(WORLDFILE_NAME)_surface_flow_table.dat.
 rhessys/tecfiles/active    Where you will place the TEC file used in your 
                             calibration runs (only one will be used, with
                             no guaranty of what will be used if there is
@@ -999,21 +1026,28 @@ with the calibration session""")
                                                     os.path.join(rhessysExecPath, rhessysExec),
                                                     tecfilePath)
 
-            # Check for explicit routing in cmd_proto
+            # Check for explicit routing and surface flowtable in cmd_proto
             explicitRouting = False
+            surfaceFlowtable = False
             if string.count(cmd_proto, " -r $flowtable ") > 0:
                 explicitRouting = True
+                if string.count(cmd_proto, " -r $flowtable $surface_flowtable ") > 0:
+                    surfaceFlowtable = True
 
             # If we're running with explicit routing,
             #   Ensure a flow table exists foreach worldfile
             if explicitRouting:
-                (flowTablesOK, flowtablePath, worldfilesWithoutFlowTables) = \
-                  self.verifyFlowTables(basedir, worldfiles.keys())
+                (flowTablesOK, flowtablePath, surfaceFlowtablePath, withoutFlowTables, withoutSurfaceFlowTables) = \
+                  self.verifyFlowTables(basedir, worldfiles.keys(), surfaceFlowtable)
                 if not flowTablesOK:
-                    for worldfile in worldfilesWithoutFlowTables:
+                    for worldfile in withoutFlowTables:
                         self.logger.debug("Worldfile without flow table: %s" %
                                           worldfile)
-                    raise Exception("Flowtable not found for each worldfile.  Set debug level to DEBUG or higher to see a list of worldfile without flow tables")
+                    if surfaceFlowtable:
+                        for worldfile in withoutSurfaceFlowTables:
+                            self.logger.debug("Worldfile without surface flow table: %s" %
+                                              worldfile)
+                    raise Exception("Flowtable or surface flowtable not found for each worldfile.  Set debug level to DEBUG or higher to see a list of worldfile without flow tables")
             
 
             self.logger.debug("DB path: %s" % 
@@ -1082,9 +1116,15 @@ with the calibration session""")
                     
                     # Add worldfile and flowtable paths to command
                     if explicitRouting:
-                        cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
-                            itr_cmd_proto, worldfiles[worldfile], 
-                            flowtablePath[worldfile])
+                        if surfaceFlowtable:
+                            cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
+                                itr_cmd_proto, worldfiles[worldfile], 
+                                flowtablePath[worldfile],
+                                surfaceFlowtablePath[worldfile])
+                        else:
+                            cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
+                                itr_cmd_proto, worldfiles[worldfile], 
+                                flowtablePath[worldfile])
                     else:
                         cmd_raw_proto = self.addWorldfileToCmdProto(\
                             itr_cmd_proto, worldfiles[worldfile])
