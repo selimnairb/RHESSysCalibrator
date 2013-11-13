@@ -78,7 +78,7 @@ class RHESSysCalibrator(object):
     __rhessysPath = None
     __outputPath = None
 
-    ## Main driver class for cluster_calibrator tool
+    ## Main driver class for rhessys_calibrator tool
     def __init__(self):
         # RE filter used to exclude redefine worldfiles (i.e. those that end in ".Y%4dM%dD%dH%d")
         self.__worldfileFilterRe = re.compile("^.*\.Y[0-9]{4}M[1-9][1-2]{0,1}D[1-9][0-9]{0,1}H[0-9][1-4]{0,1}$")
@@ -990,19 +990,19 @@ with the calibration session""")
 
         # Main events take place herein ...
         try:
-            # Make sure we have everything we need to run calibrations
-            
+            # Make sure we have everything we need to run calibrations 
+                        
             # Get list of worldfiles
             worldfiles = self.getWorldfiles(basedir)
             if len(worldfiles) < 1:
                 raise Exception("No worldfiles found")
-            self.logger.debug("worldfiles: %s" % worldfiles)
+            self.logger.debug("worldfiles: %s" % worldfiles)            
             
             # Get tecfile name
             (res, tecfilePath) = self.getTecfilePath(basedir)
             if not res:
                 raise Exception("No tecfile found")
-            
+   
             # Get RHESSys executable path
             (rhessysExecFound, rhessysExec, rhessysExecPath) = \
                 self.getRHESSysExecPath(basedir)
@@ -1010,7 +1010,7 @@ with the calibration session""")
                 raise Exception("RHESSys executable not found")
 
 #            print("calibrator: rhessysExec: %s, rhessysExecPath: %s" % (rhessysExec, rhessysExecPath) )
-
+            
             # Read cmd.proto
             cmd_proto = self._readCmdProtoFromFile(basedir)
             if None == cmd_proto:
@@ -1095,6 +1095,7 @@ with the calibration session""")
                 # Start the consumer
                 proc.start()
 
+            # TODO: Iterate over runs if we are doing a behavioral run
             # Dispatch runs to consumer
             # For each iteration (from 1 to options.iterations+1)
             iterations = options.iterations + 1 # make sure we get all N
