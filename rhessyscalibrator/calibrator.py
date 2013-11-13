@@ -763,7 +763,7 @@ class RHESSysCalibrator(object):
         session = self._calibratorDB.getSession(sessionID)
 
         return session
-                                                    
+                  
 
     def main(self, args):
 
@@ -863,7 +863,7 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("-q", "--queue", action="store",
                           type="string", dest="lsf_queue",
-                          help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week (default), bigmem.  If queue option is not supplied the 'day' queue will be used.")
+                          help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
 
         parser.add_option("--parallel_mode", action="store", 
                           type="string", dest="parallel_mode",
