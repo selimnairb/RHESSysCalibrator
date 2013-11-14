@@ -40,6 +40,7 @@ import sys
 import os
 import errno
 from optparse import OptionParser
+import argparse
 import logging
 from string import Template
 import multiprocessing
@@ -65,11 +66,27 @@ PARALLEL_MODES = ["lsf", "process"]
 
 MAX_ITERATIONS = 10000
 MAX_PROCESSORS = 1024
+MAX_POLLING_DELAY_MULT = 60 * 24
 
 FILE_READ_BUFF_SIZE = 4096
 
 DEFAULT_FLOWTABLE_SUFFIX = '_flow_table.dat'
 SURFACE_FLOWTABLE_SUFFIX = '_surface_flow_table.dat'
+
+# Custom types for argparse
+def num_jobs_type(x):
+    x = int(x)
+    if x < 1 or x > MAX_PROCESSORS:
+        raise argparse.ArgumentTypeError("Simultaneous jobs must be between 1 and %d" % (MAX_PROCESSORS,) )
+    return x
+
+def polling_delay_type(x):
+    x = int(x)
+    if x < 1 or x > MAX_POLLING_DELAY_MULT:
+        raise argparse.ArgumentTypeError("Polling delay multiplier must be between 1 and %d" % (MAX_POLLING_DELAY_MULT,) )
+    return x
+
+
 
 class RHESSysCalibrator(object):
 
@@ -86,7 +103,105 @@ class RHESSysCalibrator(object):
         self.__worldfileHeaderFilterRe = re.compile("^.*\.hdr$")
 
 
-    ## Define some class methods that are useful for other classes
+    ## Define some class methods that are useful for other classes    
+    @classmethod
+    def initializeCalibrationRunnerConsumers(cls, basedir, logger, 
+                                             session_id, parallel_mode, num_processes, polling_delay, 
+                                             lsf_queue=None, run_cmd=None, run_status_cmd=None):
+        """ Initialize a set of one or more CalibrationRunner objects
+            to be used for executing calibration runs.
+        
+            @param
+            
+            @return Tuple: (multiprocessing.JoinableQueue, [CalibrationRunner 1, ...])
+        """
+        consumers = []
+        runQueue = multiprocessing.JoinableQueue(num_processes)
+        
+        if "lsf" == parallel_mode:
+            # LSF will run our jobs us, so there is only one comsumer
+            num_consumers = 1
+        elif "process" == parallel_mode:
+            # We will run our jobs, so we need options.process consumer threads
+            num_consumers = num_processes
+        
+        for i in range(1, num_consumers + 1):
+            # Create CalibrationRunner object (consumer)
+            if "lsf" == parallel_mode:
+                assert(lsf_queue is not None)
+                assert(run_cmd is not None)
+                assert(run_status_cmd is not None)
+                consumer = CalibrationRunnerQueueLSF(basedir,
+                                                     session_id,
+                                                     runQueue,
+                                                     num_processes,
+                                                     RHESSysCalibrator.getDBPath(basedir),
+                                                     lsf_queue,
+                                                     polling_delay,
+                                                     run_cmd,
+                                                     run_status_cmd,
+                                                     logger)
+            elif "process" == parallel_mode:
+                consumer = CalibrationRunnerSubprocess(basedir,
+                                                       session_id,
+                                                       runQueue,
+                                                       RHESSysCalibrator.getDBPath(basedir),
+                                                       logger)
+            # Create process for consumer
+            proc = multiprocessing.Process(target=consumer.run,
+                                           args=())
+            consumers.append(proc)
+            # Start the consumer
+            proc.start()
+        
+        return (runQueue, consumers)
+    
+    @classmethod
+    def getRunCmd(cls, bsub_mem_limit, bsub_exclusive_mode=False):
+        """ Get LSF job submission command given selected options
+            
+            @param bsub_mem_limit Integer >=1
+            @param bsub_exclusive_mode Boolean
+            
+            @return String representing job submission command
+        """
+        assert(bsub_mem_limit >= 1)
+        
+        if bsub_exclusive_mode:
+            run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
+        else:
+            run_cmd = "bsub -n 1,1"
+        run_cmd += " -M " + str(bsub_mem_limit)
+        return run_cmd
+    
+    @classmethod
+    def getRunStatusCmd(cls):
+        """ Get LSF job status command
+    
+            @return String representing job status command
+        """
+        return "bjobs"
+    
+    @classmethod
+    def getRunCmdSim(cls, simulator_path):
+        """ Get LSF simulator job submission command
+            
+            @param simulator_path String representing path to LSF simulator
+
+            @return String representing simulated job submission command
+        """
+        return os.path.join(simulator_path, "bsub.py")
+    
+    @classmethod
+    def getRunStatusCmdSim(cls, simulator_path):
+        """ Get LSF simulator job status command
+            
+            @param simulator_path String representing path to LSF simulator
+
+            @return String representing simulated job status command
+        """
+        return os.path.join(simulator_path, "bjobs.py")
+    
     @classmethod
     def getDBPath(cls, basedir):
         """ Returns the path to the DB file relative to basedir's parent
@@ -284,10 +399,41 @@ class RHESSysCalibrator(object):
                     raise Exception("Parameter svalt2 must be supplied if parameter if svalt1 is specified")
             else:
                 raise Exception("Parameters svalt1 and svalt2 must be supplied is -svalt argument is specified")
-        
 
         return paramsProto
 
+
+    def determineRouting(self, cmd_proto):
+        """ Determine whether routing is specified in the cmd_proto (i.e. via -r flag),
+              and if so, whether a separate surface flow table is to be used
+            
+            @param cmd_proto String representing the command proto
+            
+            @return Tuple (Dict, Dict), the first containing filenames of subsurface flow tables, 
+            the second containing filenames of surface flow tables.
+        """
+        self.explicitRouting = False
+        self.surfaceFlowtable = False
+        if string.count(cmd_proto, " -r $flowtable ") > 0:
+            self.explicitRouting = True
+            if string.count(cmd_proto, " -r $flowtable $surface_flowtable ") > 0:
+                self.surfaceFlowtable = True
+        
+        # If we're running with explicit routing,
+        #   Ensure a flow table exists foreach worldfile       
+        if self.explicitRouting:
+            (flowTablesOK, flowtablePath, surfaceFlowtablePath, withoutFlowTables, withoutSurfaceFlowTables) = \
+              self.verifyFlowTables(self.basedir, self.worldfiles.keys(), self.surfaceFlowtable)
+            if not flowTablesOK:
+                for worldfile in withoutFlowTables:
+                    self.logger.debug("Worldfile without flow table: %s" %
+                                      worldfile)
+                if self.surfaceFlowtable:
+                    for worldfile in withoutSurfaceFlowTables:
+                        self.logger.debug("Worldfile without surface flow table: %s" %
+                                          worldfile)
+                raise Exception("Flowtable or surface flowtable not found for each worldfile.  Set debug level to DEBUG or higher to see a list of worldfile without flow tables")
+        return (flowtablePath, surfaceFlowtablePath)
     
     def preProcessCmdProto(self, cmd_proto, rhessys, tecfile):
         """ Pre-process cmd_proto, filling in the following values common
@@ -549,12 +695,6 @@ class RHESSysCalibrator(object):
                         if not self.__worldfileFilterRe.match(entryPath) \
                                and not self.__worldfileHeaderFilterRe.match(entryPath):
                             worldfiles[entry] = os.path.join('worldfiles', 'active', entry)
-                            # Strip $BASEDIR and "rhessys" off of front of worldfile
-                            #  path before storing
-#                            entryPathElem = entryPath.split(os.sep)
-#                            worldfiles[entry] = os.path.join(entryPathElem[2],
-#                                                             entryPathElem[3],
-#                                                             entryPathElem[4])
         return worldfiles
 
 
@@ -679,11 +819,6 @@ class RHESSysCalibrator(object):
                     # Test to see if file is executable
                     if os.access(entryPath, os.X_OK):
                         filename = entry
-#                        # Strip $BASEDIR and "rhessys" off of front of executable
-#                        #  path before storing
-#                        entryPathElem = entryPath.split(os.sep)
-#                        pathToFilename = os.path.join(entryPathElem[2],
-#                                                      entryPathElem[3])
                         ret = True
                         break
 
@@ -725,14 +860,12 @@ class RHESSysCalibrator(object):
             
         return output_path
                            
-
-
+                           
     def createCalibrationSession(self, user, project, iterations,
-                                 processes, basedir, notes=None):
+                                 processes, basedir, notes=None, cmd_proto=None):
         """ Create calibration session for this session in the database 
 
-            @precondition self._cmd_proto = os.path.join(basedir, "cmd.proto")
-            @precondition self._calibratorDB point to a valid ModelRunnerDB
+            @precondition self.calibratorDB point to a valid ModelRunnerDB
 
             @param user String representing the user associated with the session
             @param project String representing the project associated with the session
@@ -743,6 +876,8 @@ class RHESSysCalibrator(object):
             @param basedir String representing the basedir wherein session files and 
                                    directories are stored
             @param notes String representing notes associated with the session
+            @param cmd_proto String representing cmd_proto to use for runs in session.  
+                     If None, cmd.proto will be read from basedir.
 
             @return model_runner_db.ModelSession object 
             representing the session that was created in the database.
@@ -750,17 +885,18 @@ class RHESSysCalibrator(object):
             @raise IOError is reading cmd.proto fails
         """
         # Read cmd.proto
-        cmd_proto = self._readCmdProto()
+        if cmd_proto is None:
+            cmd_proto = self._readCmdProto()
 
         # Create the CalibrationSession
-        sessionID = self._calibratorDB.insertSession(user, project, notes,
+        sessionID = self.calibratorDB.insertSession(user, project, notes,
                                                       iterations, processes,
                                                       basedir, cmd_proto)
         assert sessionID != None
         
         # Could eliminate DB round trip if we just pack our own object,
         #  but this tests that insertSession succeeded
-        session = self._calibratorDB.getSession(sessionID)
+        session = self.calibratorDB.getSession(sessionID)
 
         return session
                   
@@ -859,7 +995,7 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("-s", "--simulator_path", action="store", 
                           type="string", dest="simulator_path",
-                          help="[OPTIONAL] set path for LSF simulator.  when supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/cluster_calibrator/lsf-sim)")
+                          help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
 
         parser.add_option("-q", "--queue", action="store",
                           type="string", dest="lsf_queue",
@@ -898,15 +1034,15 @@ obs/                       Where you will store observed data to be compared to
 
         if not options.basedir:
             parser.error("Please specify the basedir for the calibration session")
-        basedir = os.path.abspath(options.basedir)            
+        self.basedir = os.path.abspath(options.basedir)            
 
         # Create/verify directory structure in session directory
         try:
-            self.createVerifyDirectoryStructure(basedir)
+            self.createVerifyDirectoryStructure(self.basedir)
 
             if options.create:
                 # --create option was specified, just exit
-                print "Calibration session directory structure created in %s" % basedir
+                print "Calibration session directory structure created in %s" % self.basedir
                 return 0 # exit normally
         except:
             print "Exception ocurred while creating/verifying directory structure"
@@ -957,7 +1093,7 @@ with the calibration session""")
             options.bsub_exclusive_mode = 0;
 
         self.logger.critical("parallel mode: %s" % options.parallel_mode)
-        self.logger.debug("basedir: %s" % basedir)
+        self.logger.debug("basedir: %s" % self.basedir)
         self.logger.debug("user: %s" % options.user)
         self.logger.debug("project: %s" % options.project)
         if None != options.notes:
@@ -967,52 +1103,34 @@ with the calibration session""")
 
         # Check for simulator_path, setup job commands accordingly
         if options.simulator_path:
-            run_cmd = os.path.join(options.simulator_path, "bsub.py")
-            run_status_cmd = os.path.join(options.simulator_path,
-                                          "bjobs.py")
+            run_cmd = RHESSysCalibrator.getRunCmdSim(options.simulator_path)
+            run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(options.simulator_path)
         else:
-            if options.bsub_exclusive_mode:
-                run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
-            else:
-                run_cmd = "bsub -n 1,1"
-            run_cmd += " -M " + str(options.bsub_mem_limit)
-            
-            run_status_cmd = "bjobs"
-
-        # Set number of consumer threads
-        if "lsf" == options.parallel_mode:
-            # LSF will run our jobs us, so there is only one comsumer
-            num_consumers = 1
-        elif "process" == options.parallel_mode:
-            # We will run our jobs, so we need options.process consumer threads
-            num_consumers = options.processes
-        consumers = []
+            run_cmd = RHESSysCalibrator.getRunCmd(options.bsub_mem_limit, options.bsub_exclusive_mode)
+            run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
 
         # Main events take place herein ...
         try:
-            # Make sure we have everything we need to run calibrations 
-                        
+            # Make sure we have everything we need to run calibrations        
             # Get list of worldfiles
-            worldfiles = self.getWorldfiles(basedir)
-            if len(worldfiles) < 1:
+            self.worldfiles = self.getWorldfiles(self.basedir)
+            if len(self.worldfiles) < 1:
                 raise Exception("No worldfiles found")
-            self.logger.debug("worldfiles: %s" % worldfiles)            
+            self.logger.debug("worldfiles: %s" % self.worldfiles)            
             
             # Get tecfile name
-            (res, tecfilePath) = self.getTecfilePath(basedir)
+            (res, tecfilePath) = self.getTecfilePath(self.basedir)
             if not res:
                 raise Exception("No tecfile found")
    
             # Get RHESSys executable path
             (rhessysExecFound, rhessysExec, rhessysExecPath) = \
-                self.getRHESSysExecPath(basedir)
+                self.getRHESSysExecPath(self.basedir)
             if not rhessysExecFound:
                 raise Exception("RHESSys executable not found")
-
-#            print("calibrator: rhessysExec: %s, rhessysExecPath: %s" % (rhessysExec, rhessysExecPath) )
             
             # Read cmd.proto
-            cmd_proto = self._readCmdProtoFromFile(basedir)
+            cmd_proto = self._readCmdProtoFromFile(self.basedir)
             if None == cmd_proto:
                 raise Exception("cmd.proto file not found")
             elif '' == cmd_proto:
@@ -1026,76 +1144,31 @@ with the calibration session""")
                                                     os.path.join(rhessysExecPath, rhessysExec),
                                                     tecfilePath)
 
-            # Check for explicit routing and surface flowtable in cmd_proto
-            explicitRouting = False
-            surfaceFlowtable = False
-            if string.count(cmd_proto, " -r $flowtable ") > 0:
-                explicitRouting = True
-                if string.count(cmd_proto, " -r $flowtable $surface_flowtable ") > 0:
-                    surfaceFlowtable = True
-
-            # If we're running with explicit routing,
-            #   Ensure a flow table exists foreach worldfile
-            if explicitRouting:
-                (flowTablesOK, flowtablePath, surfaceFlowtablePath, withoutFlowTables, withoutSurfaceFlowTables) = \
-                  self.verifyFlowTables(basedir, worldfiles.keys(), surfaceFlowtable)
-                if not flowTablesOK:
-                    for worldfile in withoutFlowTables:
-                        self.logger.debug("Worldfile without flow table: %s" %
-                                          worldfile)
-                    if surfaceFlowtable:
-                        for worldfile in withoutSurfaceFlowTables:
-                            self.logger.debug("Worldfile without surface flow table: %s" %
-                                              worldfile)
-                    raise Exception("Flowtable or surface flowtable not found for each worldfile.  Set debug level to DEBUG or higher to see a list of worldfile without flow tables")
-            
+            # Check for explicit routing and surface flowtable in cmd_proto, get dicts of
+            # flowtables from basedir
+            (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
 
             self.logger.debug("DB path: %s" % 
-                              RHESSysCalibrator.getDBPath(basedir))
+                              RHESSysCalibrator.getDBPath(self.basedir))
 
-            self._calibratorDB = \
+            self.calibratorDB = \
                 ModelRunnerDB(RHESSysCalibrator.getDBPath(
-                    basedir))
+                    self.basedir))
 
             # Create session
             self.session = self.createCalibrationSession(options.user, 
                                                          options.project,
                                                          options.iterations,
                                                          options.processes,
-                                                         basedir,
+                                                         self.basedir,
                                                          options.notes)
 
-            # Allocate dispatch queue/pipe with of size options.processes
-#            if "queue" == options.ipc:
-            runQueue = multiprocessing.JoinableQueue(options.processes)
-            
-            for i in range(1, num_consumers + 1):
-                # Create CalibrationRunner object (consumer)
-                if "lsf" == options.parallel_mode:
-                    consumer = CalibrationRunnerQueueLSF(basedir,
-                                                         self.session.id,
-                                                         runQueue,
-                                                         options.processes,
-                                                         RHESSysCalibrator.getDBPath(basedir),
-                                                         options.lsf_queue,
-                                                         options.polling_delay,
-                                                         run_cmd,
-                                                         run_status_cmd,
-                                                         self.logger)
-                elif "process" == options.parallel_mode:
-                    consumer = CalibrationRunnerSubprocess(basedir,
-                                                           self.session.id,
-                                                           runQueue,
-                                                           RHESSysCalibrator.getDBPath(basedir),
-                                                           self.logger)
-                # Create process for consumer
-                proc = multiprocessing.Process(target=consumer.run,
-                                               args=())
-                consumers.append(proc)
-                # Start the consumer
-                proc.start()
+            # Initialize CalibrationRunner consumers for executing jobs
+            (runQueue, consumers) = \
+                RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
+                                                                       self.session.id, options.parallel_mode, options.processes, options.polling_delay,
+                                                                       options.lsf_queue, run_cmd, run_status_cmd)
 
-            # TODO: Iterate over runs if we are doing a behavioral run
             # Dispatch runs to consumer
             # For each iteration (from 1 to options.iterations+1)
             iterations = options.iterations + 1 # make sure we get all N
@@ -1106,7 +1179,7 @@ with the calibration session""")
                 itr_cmd_proto = self.addParametersToCmdProto(cmd_proto_pre,
                                                              parameterValues)
                 # For each world file
-                for worldfile in worldfiles.keys():
+                for worldfile in self.worldfiles.keys():
                     self.logger.critical("Iteration %d, worldfile: %s" %
                                          (itr, worldfile))
                     # Create new ModelRun object for this run
@@ -1116,22 +1189,22 @@ with the calibration session""")
                     run.setCalibrationParameters(parameterValues)
                     
                     # Add worldfile and flowtable paths to command
-                    if explicitRouting:
-                        if surfaceFlowtable:
+                    if self.explicitRouting:
+                        if self.surfaceFlowtable:
                             cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
-                                itr_cmd_proto, worldfiles[worldfile], 
-                                flowtablePath[worldfile],
-                                surfaceFlowtablePath[worldfile])
+                                itr_cmd_proto, self.worldfiles[worldfile], 
+                                self.flowtablePath[worldfile],
+                                self.surfaceFlowtablePath[worldfile])
                         else:
                             cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
-                                itr_cmd_proto, worldfiles[worldfile], 
-                                flowtablePath[worldfile])
+                                itr_cmd_proto, self.worldfiles[worldfile], 
+                                self.flowtablePath[worldfile])
                     else:
                         cmd_raw_proto = self.addWorldfileToCmdProto(\
-                            itr_cmd_proto, worldfiles[worldfile])
+                            itr_cmd_proto, self.worldfiles[worldfile])
 
                     # Finally, create output_path and generate cmd_raw
-                    run.output_path = self.createOutputPath(basedir,
+                    run.output_path = self.createOutputPath(self.basedir,
                                                             self.session.id,
                                                             worldfile,
                                                             itr)
@@ -1146,7 +1219,6 @@ with the calibration session""")
                     # Dispatch to consumer
                     runQueue.put(run)
 
-
             time.sleep(5)
 
             # Wait for all jobs to finish
@@ -1156,7 +1228,7 @@ with the calibration session""")
                 consumerProcess.join()
 
             # Update session endtime and status
-            self._calibratorDB.updateSessionEndtime(self.session.id,
+            self.calibratorDB.updateSessionEndtime(self.session.id,
                                                      datetime.utcnow(),
                                                      "complete")
                         
@@ -1170,4 +1242,4 @@ with the calibration session""")
         finally:
             # Decrement reference count, this will (hopefully) allow __del__
             #  to be called on the once referenced object
-            self._calibratorDB = None
+            self.calibratorDB = None

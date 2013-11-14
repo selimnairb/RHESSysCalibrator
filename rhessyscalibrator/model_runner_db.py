@@ -44,6 +44,8 @@ Old revision history:
 import sqlite3
 from datetime import datetime
 
+from calibration_parameters import CalibrationParameters
+
 class ModelRunnerDB(object):
     """ Class for setting up, and storing modeling session and run
         information in a sqlite-base DB.  A model runner DB stores
@@ -499,7 +501,7 @@ WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, i
 
         return run
 
-    def getRunsInSession(self, session_id):
+    def getRunsInSession(self, session_id, where_clause=None):
         """ Get all runs associated with a session
 
             @param session_id Integer representing the session whose list of runs we want
@@ -507,11 +509,13 @@ WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, i
             @return An array of ModelRun objects
         """
         cursor = self._conn.cursor()
-
         runs = []
 
-        cursor.execute("""SELECT * from run WHERE session_id=?""", 
-                       (session_id,))
+        queryProto = "SELECT * from run WHERE session_id=?"
+        if where_clause:
+            queryProto += " AND " + where_clause
+
+        cursor.execute(queryProto, (session_id,))
         for row in cursor:
             runs.append(self._runRecordToObject(row))
 
@@ -674,7 +678,6 @@ class ModelRun(object):
         self.user2 = None
         self.user3 = None
         self.fitness_period = None
-
     
     def setCalibrationParameters(self, params):
         """ Set calibration parameters as supplied by parameter class.
@@ -707,4 +710,17 @@ class ModelRun(object):
             self.param_svalt1 = params.svalt1
         if params.svalt2 != None:
             self.param_svalt2 = params.svalt2
+            
+    def getCalibrationParameters(self):
+        """ Get calibration parameters as a 
+            cluster_parameters.CalibrationParametersparameter object.
+           
+            @return cluster_parameters.CalibrationParameters
+        """
+        params = CalibrationParameters(self.param_s1, self.param_s2, self.param_s3,
+                                       self.param_sv1, self.param_sv2, 
+                                       self.param_gw1, self.param_gw2,
+                                       self.param_vgsen1, self.param_vgsen2, self.param_vgsen3,
+                                       self.param_svalt1, self.param_svalt2)
+        return params
 
