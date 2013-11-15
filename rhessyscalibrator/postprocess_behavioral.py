@@ -159,6 +159,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                             dest="observed_file",
                             help="The name of the observed file to use for calculating model fitness statistics.  Filename will be interpreted as being relative to $BASEDIR/obs. If not supplied observation file from calibration model run will be used.")
 
+        parser.add_argument("-of", "--outputFormat", action="store",
+                            dest="outputFormat", default="PDF", choices=["PDF", "PNG"],
+                            help="Output format to save figures in.")
+
         parser.add_argument("-l", "--loglevel", action="store",
                             dest="loglevel", default="OFF",
                             help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
@@ -282,13 +286,13 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 # Generate visualization
                 behavioralFilename = "behavioral_SESSION_%s" % ( options.session_id, ) 
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
-                                               2.5, 97.5, format='PDF', log=False,
+                                               2.5, 97.5, format=options.outputFormat, log=False,
                                                ylabel=r'Streamflow (mm)',
                                                title=options.title)
                 
                 behavioralFilename = "behavioral-log_SESSION_%s" % ( options.session_id, ) 
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
-                                               2.5, 97.5, format='PDF', log=True,
+                                               2.5, 97.5, format=options.outputFormat, log=True,
                                                ylabel=r'$Log_{10}$(Streamflow) (mm)',
                                                title=options.title)
         except:

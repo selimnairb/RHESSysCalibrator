@@ -27,6 +27,8 @@ setup(name='rhessyscalibrator',
       ],
       scripts=['bin/lsf-sim/bjobs.py',
                'bin/lsf-sim/bsub.py',
+               'bin/rhessys_calibrator_behavioral.py',
+               'bin/rhessys_calibrator_postprocess_behavioral.py',
                'bin/rhessys_calibrator.py',
                'bin/rhessys_calibrator_postprocess.py',
                'bin/rhessys_calibrator_results.py'
