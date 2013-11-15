@@ -123,7 +123,11 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
                                           job.param_svalt1, job.param_svalt2,
                                           job.cmd_raw,
                                           job.output_path,
-                                          job.job_id)
+                                          job.job_id,
+                                          job.fitness_period,
+                                          job.nse, job.nse_log,
+                                          job.pbias, job.rsr,
+                                          job.user1, job.user2, job.user3)
         job.id = insertedRunID
         
 #        print("runJobInSubprocess: __rhessys_base: %s, cwd: %s, target cwd: %s, cmd: %s" % (self.__rhessys_base, os.getcwd(), os.path.abspath( self.basedir ), job.cmd_raw ) )
@@ -280,18 +284,6 @@ class CalibrationRunnerLSF(CalibrationRunner):
         process = Popen(bsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
                         cwd=self.__rhessys_base, bufsize=1)
         
-        # Check for pending job threshold
-#        stderr_line = process.stderr.readline()
-#        self.logger.critical(stderr_line)
-#        while stderr_line != '':
-#            match_err = self.__bsubErrRegex.match(stderr_line)
-#            if match_err:
-#                self.logger.critical(stderr_line) 
-#                time.sleep(self.JOB_SUBMIT_PENDING_THRESHOLD_SLEEP_SECS)
-#                stderr_line = process.stderr.readline()
-#            else:
-#                break
-        
         (process_stdout, process_stderr) = process.communicate()    
         
         # Read job id from bsub outupt (e.g. "Job <ID> is submitted ..."
@@ -315,7 +307,11 @@ class CalibrationRunnerLSF(CalibrationRunner):
                                           job.param_svalt1, job.param_svalt2,
                                           job.cmd_raw,
                                           job.output_path,
-                                          job.job_id)
+                                          job.job_id,
+                                          job.fitness_period,
+                                          job.nse, job.nse_log,
+                                          job.pbias, job.rsr,
+                                          job.user1, job.user2, job.user3)
         job.id = insertedRunID
         self.logger.debug("Run %s submitted as job %s" % 
                           (job.id, job.job_id))

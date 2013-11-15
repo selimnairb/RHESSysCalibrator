@@ -54,7 +54,7 @@ from rhessyscalibrator.model_runner_db import *
 
 
 class RHESSysCalibratorPostprocess(object):
-    """ Main driver class for cluster_calibrator_postprocess tool
+    """ Main driver class for rhessys_calibrator_postprocess tool
     """
     TIME_STEP_HOURLY = 1
     TIME_STEP_DAILY = 2
@@ -618,7 +618,7 @@ Run "%prog --help" for detailed description of all options
         
         parser.add_option("-o", "--outdir", action="store", type="string",
                           dest="outdir",
-                          help="[REQUIRED] output directory in which to place dotty plot figures")
+                          help="[OPTIONAL] output directory in which to place dotty plot figures.  If not specified, basedir will be used.")
 
         parser.add_option("-f", "--file", action="store", type="string",
                           dest="observed_file",
@@ -656,10 +656,13 @@ Run "%prog --help" for detailed description of all options
             
         if not options.basedir:
             parser.error("Please specify the basedir for the calibration session")
+        if not os.path.isdir(options.basedir) or not os.access(options.basedir, os.W_OK):
+            sys.exit("Unable to write to basedir %s" % (options.basedir,) )
+        basedir = os.path.abspath(options.basedir)
         
         if not options.outdir:
-            parser.error("Please specify the figure output directory for the calibration session")
-        
+            options.outdir = basedir
+            
         if not options.session_id:
             parser.error("Please specify the ID of session for which you'd like t calculate model fitness statistics")
 
@@ -670,24 +673,24 @@ Run "%prog --help" for detailed description of all options
             parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
         outdirPath = os.path.abspath(options.outdir)
 
-        dbPath = RHESSysCalibrator.getDBPath(options.basedir)
+        dbPath = RHESSysCalibrator.getDBPath(basedir)
         if not os.access(dbPath, os.R_OK):
             raise IOError(errno.EACCES, "The database at %s is not readable" %
                           dbPath)
         self.logger.debug("DB path: %s" % dbPath)
 
-        obsPath = RHESSysCalibrator.getObsPath(options.basedir)
+        obsPath = RHESSysCalibrator.getObsPath(basedir)
         obsFilePath = os.path.join(obsPath, options.observed_file)
         if not os.access(obsFilePath, os.R_OK):
             raise IOError(errno.EACCES, "The observed data file %s is  not readable" % obsFilePath)
         self.logger.debug("Obs path: %s" % obsFilePath)
 
-        outputPath = RHESSysCalibrator.getOutputPath(options.basedir)
+        outputPath = RHESSysCalibrator.getOutputPath(basedir)
         if not os.access(outputPath, os.R_OK):
             raise IOError(errno.EACCES, "The output directory %s is  not readable" % outputPath)
         self.logger.debug("Output path: %s" % outputPath)
 
-        rhessysPath = RHESSysCalibrator.getRhessysPath(options.basedir)
+        rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
 
         startDate = None
         if options.startdate:
@@ -699,7 +702,7 @@ Run "%prog --help" for detailed description of all options
         try:
             calibratorDB = \
                 ModelRunnerDB(RHESSysCalibrator.getDBPath(
-                    options.basedir))
+                    basedir))
             
             # Make sure the session exists
             session = calibratorDB.getSession(options.session_id)
@@ -735,7 +738,6 @@ Run "%prog --help" for detailed description of all options
             self.logger.debug("Observed data: %s" % obs_data)
 
             runsProcessed = False
-
             for run in runs:
                 if "DONE" == run.status:
                     runOutput = os.path.join(rhessysPath, run.output_path)

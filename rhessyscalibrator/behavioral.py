@@ -54,7 +54,6 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
         RHESSysCalibrator.__init__(self)
     
     def main(self, args):
-        
         # Set up command line options
         parser = argparse.ArgumentParser(description="Tool for performing behavioral model runs for RHESSys")
         parser.add_argument("-b", "--basedir", action="store", 
@@ -234,6 +233,10 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                                                          self.basedir,
                                                          notes,
                                                          cmd_proto)
+            # Get observation file from calibrationSession
+            self.session.obs_filename = calibSession.obs_filename
+            self.calibratorDB.updateSessionObservationFilename(self.session.id,
+                                                               self.session.obs_filename)
             
             # Initialize CalibrationRunner consumers for executing jobs
             (runQueue, consumers) = \
@@ -254,10 +257,19 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                     self.logger.critical("Iteration %d, worldfile: %s" %
                                          (itr, worldfile))
                     # Create new ModelRun object for this run
-                    run = ModelRun()
-                    run.session_id = self.session.id
-                    run.worldfile = worldfile
-                    run.setCalibrationParameters(parameterValues)
+                    behavioralRun = ModelRun()
+                    behavioralRun.session_id = self.session.id
+                    behavioralRun.worldfile = worldfile
+                    behavioralRun.setCalibrationParameters(parameterValues)
+                    # Copy fitness parameters so that we can draw undercertainty bounds later
+                    behavioralRun.nse = run.nse
+                    behavioralRun.nse_log = run.nse_log
+                    behavioralRun.pbias = run.pbias
+                    behavioralRun.rsr = run.rsr
+                    behavioralRun.user1 = run.user1
+                    behavioralRun.user2 = run.user2
+                    behavioralRun.user3 = run.user3
+                    behavioralRun.fitness_period = run.fitness_period
                     
                     # Add worldfile and flowtable paths to command
                     if self.explicitRouting:
@@ -275,20 +287,20 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                             itr_cmd_proto, self.worldfiles[worldfile])
 
                     # Finally, create output_path and generate cmd_raw
-                    run.output_path = self.createOutputPath(self.basedir,
+                    behavioralRun.output_path = self.createOutputPath(self.basedir,
                                                             self.session.id,
                                                             worldfile,
                                                             itr)
-                    run.cmd_raw = self.getCmdRawForRun(cmd_raw_proto,
-                                                       run.output_path)
+                    behavioralRun.cmd_raw = self.getCmdRawForRun(cmd_raw_proto,
+                                                       behavioralRun.output_path)
         
                     if "process" == options.parallel_mode:
                         # Set job ID if we are in process parallel mode
                         #   (in lsf mode, we will use the LSF job number instead of itr)
-                        run.job_id = itr
+                        behavioralRun.job_id = itr
         
                     # Dispatch to consumer
-                    runQueue.put(run)
+                    runQueue.put(behavioralRun)
 
             time.sleep(5)
 
@@ -300,8 +312,8 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
 
             # Update session endtime and status
             self.calibratorDB.updateSessionEndtime(self.session.id,
-                                                     datetime.utcnow(),
-                                                     "complete") 
+                                                   datetime.utcnow(),
+                                                   "complete") 
         except:
             raise
         else:
