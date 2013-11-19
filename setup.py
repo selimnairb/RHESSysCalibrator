@@ -23,7 +23,7 @@ setup(name='rhessyscalibrator',
       license='BSD',
       packages=['rhessyscalibrator', 'rhessyscalibrator.tests'],
       install_requires=['numpy>=1.7',
-                        'matplotlib>=1.3'
+                        'matplotlib>=1.1'
       ],
       scripts=['bin/lsf-sim/bjobs.py',
                'bin/lsf-sim/bsub.py',
