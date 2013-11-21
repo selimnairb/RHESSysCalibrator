@@ -436,7 +436,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 10)
+                a.set_xlim(0, 20)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -447,7 +447,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 10)
+                a.set_xlim(0, 20)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 a.set_ylabel('N-S efficiency for log daily streamflow', fontsize='xx-small')
@@ -462,7 +462,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 50)
+                a.set_xlim(0, 150)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -473,7 +473,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 50)
+                a.set_xlim(0, 150)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -487,7 +487,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0.5, 2.0)
+                a.set_xlim(0, 10)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -498,7 +498,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0.5, 2.0)
+                a.set_xlim(0, 10)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -512,7 +512,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 6)
+                a.set_xlim(0, 10)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -523,7 +523,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 6)
+                a.set_xlim(0, 10)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -537,7 +537,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 150)
+                a.set_xlim(0, 50)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -548,7 +548,7 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(0, 150)
+                a.set_xlim(0, 50)
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
