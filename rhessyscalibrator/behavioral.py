@@ -64,10 +64,13 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                           dest="session_id", required=True,
                           help="Session to use for behavioral runs.")
         
-        parser.add_argument('-st', dest='startDate', required=True, nargs=4, type=int,
-                            help='Start date and time for behavioral model runs, of the form "YYYY M D H"')
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument("-st", dest="startDate", nargs=4, type=int,
+                           help='Start date and time for behavioral model runs, of the form "YYYY M D H"')
+        group.add_argument("-c", "--cmdproto", dest="cmdproto",
+                           help="Filename of cmd.proto to use for behavioral runs (relative to basedir)")
         
-        parser.add_argument('-ed', dest='endDate', required=True, nargs=4, type=int,
+        parser.add_argument('-ed', dest='endDate', required=False, nargs=4, type=int,
                             help='Date date and time for behavioral model runs, of the form "YYYY M D H"')
         
         parser.add_argument("-f", "--behavioral_filter", action="store",
@@ -132,28 +135,43 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
         if not os.path.isdir(options.basedir) or not os.access(options.basedir, os.R_OK):
             sys.exit("Unable to read project directory %s" % (options.basedir,) )
         self.basedir = os.path.abspath(options.basedir) 
-               
-        # Make sure start date is before end date
-        startDate = datetime(options.startDate[0], 
-                             options.startDate[1],
-                             options.startDate[2],
-                             options.startDate[3])
-        endDate = datetime(options.endDate[0], 
-                           options.endDate[1],
-                           options.endDate[2],
-                           options.endDate[3])
-        if startDate >= endDate:
-            sys.exit("Start date %s is not before end date %s" % (str(startDate), str(endDate)) )
-        startDateStr = ' '.join([str(d) for d in options.startDate])
-        endDateStr = ' '.join([str(d) for d in options.endDate])
-        
+            
         self.logger.critical("parallel mode: %s" % options.parallel_mode)
         self.logger.debug("basedir: %s" % self.basedir)
         self.logger.debug("user: %s" % options.user)
         self.logger.debug("project: %s" % options.project)
         self.logger.debug("jobs: %d" % options.processes)
-        self.logger.debug("start date: %s" % (startDate,) )
-        self.logger.debug("end date: %s" % (endDate,) )
+               
+        if options.startDate:
+            if not options.endDate:
+                sys.exit("You must specify a simulation end date")
+            startDate = datetime(options.startDate[0], 
+                                 options.startDate[1],
+                                 options.startDate[2],
+                                 options.startDate[3])
+            endDate = datetime(options.endDate[0], 
+                               options.endDate[1],
+                               options.endDate[2],
+                               options.endDate[3])
+            # Make sure start date is before end date
+            if startDate >= endDate:
+                sys.exit("Start date %s is not before end date %s" % (str(startDate), str(endDate)) )
+            startDateStr = ' '.join([str(d) for d in options.startDate])
+            endDateStr = ' '.join([str(d) for d in options.endDate])
+        
+            readCmdProtoFromRun = True
+        
+            self.logger.debug("start date: %s" % (startDate,) )
+            self.logger.debug("end date: %s" % (endDate,) )
+        if options.cmdproto:
+            cmdProtoPath = os.path.join(self.basedir, options.cmdproto)
+            if not os.access(cmdProtoPath, os.R_OK):
+                sys.exit("Unable to read behavioral cmd.proto: %s" % (cmdProtoPath,) )
+            
+            readCmdProtoFromRun = False
+            
+            self.logger.debug("behavioral cmd.proto: %s" % (cmdProtoPath,) )
+        
         
         notes = "Behavioral run, using filter: %s" % (options.behavioral_filter,)
         
@@ -206,15 +224,21 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             if not rhessysExecFound:
                 raise Exception("RHESSys executable not found")
             
-            # Rewrite cmd_proto to use dates from command line
-            cmd_proto = re.sub("-st (\d{4} \d{1,2} \d{1,2} \d{1,2})",
-                               "-st %s" % (startDateStr,),
-                               calibSession.cmd_proto)
-            cmd_proto = re.sub("-ed (\d{4} \d{1,2} \d{1,2} \d{1,2})",
-                               "-ed %s" % (endDateStr,),
-                               cmd_proto)
-            self.logger.debug("Original cmd.proto: %s" % (calibSession.cmd_proto,) )
-            self.logger.debug("Behavioral cmd.proto: %s" % (cmd_proto,) )
+            if readCmdProtoFromRun:
+                # Rewrite cmd_proto to use dates from command line
+                cmd_proto = re.sub("-st (\d{4} \d{1,2} \d{1,2} \d{1,2})",
+                                   "-st %s" % (startDateStr,),
+                                   calibSession.cmd_proto)
+                cmd_proto = re.sub("-ed (\d{4} \d{1,2} \d{1,2} \d{1,2})",
+                                   "-ed %s" % (endDateStr,),
+                                   cmd_proto)
+                self.logger.debug("Original cmd.proto: %s" % (calibSession.cmd_proto,) )
+                self.logger.debug("Behavioral cmd.proto: %s" % (cmd_proto,) )
+            else:
+                # Use cmd proto from file
+                fd = open(cmdProtoPath)
+                cmd_proto = fd.read()
+                fd.close()
             
             # Pre-process cmd.proto to add rhessys exec and tecfile path
             cmd_proto_pre = self.preProcessCmdProto(cmd_proto,
