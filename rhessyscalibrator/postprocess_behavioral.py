@@ -76,20 +76,29 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         # self.obs_datetime, self.obs_data
         
         # Normalize likelihood to have values from 0 to 1
-        normalizedLikelihood = self.likelihood / numpy.sum(self.likelihood)
+        normLH = self.likelihood / numpy.sum(self.likelihood)
+        
+        lower = lowerBound / 100.0
+        upper = upperBound / 100.0
         
         # Get the uncertainty boundary
         nIters = numpy.shape(self.ysim)[1]
         minYsim = numpy.zeros(nIters)
         maxYsim = numpy.zeros(nIters)
-        
-        # Generate uncertainty interval bounded by lowerBound and upperBound
+
+        # Generate uncertainty interval bounded by lower bound and upper bound
         for i in xrange(0, nIters):
             ys = self.ysim[:,i]
-            tmp = ys[ys < numpy.percentile(ys, upperBound)]
-            validYsim = tmp[tmp > numpy.percentile(tmp, lowerBound)]
-            minYsim[i] = numpy.min(validYsim)
-            maxYsim[i] = numpy.max(validYsim)
+            # Use CDF of likelihood values as basis for interval
+            sortedIdx = numpy.argsort(ys)
+            sortYsim = ys[sortedIdx]
+            sortLH = normLH[sortedIdx]
+            cumLH = numpy.cumsum(sortLH)
+            cond = (cumLH > lower) & (cumLH < upper)
+            
+            validYsim = sortYsim[cond]
+            minYsim[i] = validYsim[0]
+            maxYsim[i] = validYsim[-1]
             
         # Plot it up
         fig = plt.figure()
