@@ -808,6 +808,10 @@ Run "%prog --help" for detailed description of all options
                                  options.startdate[1],
                                  options.startdate[2],
                                  options.startdate[3])
+        else:
+            # Set start data based on observed data
+            startDate = obs_datetime[0]
+            
         if options.enddate:
             # Set end date based on command line
             endDate = datetime(options.enddate[0],
@@ -817,37 +821,36 @@ Run "%prog --help" for detailed description of all options
             if not endDate > startDate:
                 sys.exit("End date %s is not greater than start date %s" % \
                          (str(endDate, str(startDate)) ) )
-        
-        if not startDate and not endDate:
-            # Set start and end dates based on observed data
-            startDate = obs_datetime[0]
+        else:
+            # Set end date based on observed data
             endDate = obs_datetime[-1]
 
         # Determine start and end indices
-        calibDays = None
-        if startDate and endDate:
-            delta = endDate - startDate
-            calibDays = delta.days
+        delta = endDate - startDate
+        calibDays = delta.days
             
         obsStartIdx = None
         obsEndIdx = None
-        if startDate:
-            for (counter, tmpDate) in enumerate(obs_datetime):
-                if tmpDate.hour == startDate.hour and \
-                    tmpDate.day == startDate.day and \
-                    tmpDate.month == startDate.month and \
-                    tmpDate.year == startDate.year:
-                    obsStartIdx = counter
-                    if calibDays:
-                        obsEndIdx = obsStartIdx + calibDays
-                    break
+        for (counter, tmpDate) in enumerate(obs_datetime):
+            if tmpDate.hour == startDate.hour and \
+                tmpDate.day == startDate.day and \
+                tmpDate.month == startDate.month and \
+                tmpDate.year == startDate.year:
+                obsStartIdx = counter
+                obsEndIdx = obsStartIdx + calibDays
+                break
         
-        if obsStartIdx:
-            self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
-                              (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
-        if obsEndIdx:
-            self.logger.debug("Obs end idx: %d, date: %s, value: %f" % 
-                          (obsEndIdx, str(obs_datetime[obsEndIdx]), obs_data[obsEndIdx] ) )
+        if obsStartIdx == None:
+            sys.exit("Unable to find start date %s in observed data %s" %
+                     (str(startDate), obsFilePath) )
+        if obsEndIdx == None:
+            sys.exit("Unable to find end date %s in observed data %s" %
+                     (str(endDate), obsFilePath) )
+        
+        self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
+                          (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
+        self.logger.debug("Obs end idx: %d, date: %s, value: %f" % 
+                      (obsEndIdx, str(obs_datetime[obsEndIdx]), obs_data[obsEndIdx] ) )
 
         try:
             calibratorDB = \
@@ -913,39 +916,34 @@ Run "%prog --help" for detailed description of all options
                     self.logger.debug("Output file %s: %s" % (tmpOutfile, tmpResults))
                     tmpFile.close()
             
-                    # Make sure observed and modeled data are of the same
-                    #   extent
+                    # Make sure observed and modeled data are of the same extent
                     my_obs_data = obs_data
-                    if startDate:
-                        modelStartIdx = None
-                        modelEndIdx = None
-                        for (counter, tmpDate) in enumerate(model_datetime):
-                            if tmpDate.hour == startDate.hour and \
-                                tmpDate.day == startDate.day and \
-                                tmpDate.month == startDate.month and \
-                                tmpDate.year == startDate.year:
-                                modelStartIdx = counter
-                                if calibDays:
-                                    modelEndIdx = modelStartIdx + calibDays
-                                break 
+                    modelStartIdx = None
+                    modelEndIdx = None
+                    for (counter, tmpDate) in enumerate(model_datetime):
+                        if tmpDate.hour == startDate.hour and \
+                            tmpDate.day == startDate.day and \
+                            tmpDate.month == startDate.month and \
+                            tmpDate.year == startDate.year:
+                            modelStartIdx = counter
+                            modelEndIdx = modelStartIdx + calibDays
+                            break 
+                    
+                    if modelStartIdx == None:
+                        sys.exit("Unable to find start date %s in model data %s" %
+                                 (str(startDate), tmpOutfile) )
+                    if modelEndIdx == None:
+                        sys.exit("Unable to find end date %s in model data %s" %
+                                 (str(endDate), tmpOutfile) )
+                    
+                    self.logger.debug("Runid: %d" % (run.id,) )    
+                    self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
+                          (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
+                    self.logger.debug("Model end idx: %d, date: %s, value: %f" %
+                                      (modelEndIdx, str(model_datetime[modelEndIdx]), tmpResults[modelEndIdx]) )
                         
-                        self.logger.debug("Runid: %d" % (run.id,) )    
-                        self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
-                              (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
-                        if modelEndIdx:
-                            self.logger.debug("Model end idx: %d, date: %s, value: %f" %
-                                              (modelEndIdx, str(model_datetime[modelEndIdx]), tmpResults[modelEndIdx]) )
-                            
-                        if obsStartIdx:
-                            if obsEndIdx:
-                                my_obs_data = obs_data[obsStartIdx:obsEndIdx]
-                            else:
-                                my_obs_data = obs_data[obsStartIdx:]
-                        if modelStartIdx:
-                            if modelEndIdx:
-                                tmpResults = tmpResults[modelStartIdx:modelEndIdx]
-                            else:
-                                tmpResults = tmpResults[modelStartIdx:]
+                    my_obs_data = obs_data[obsStartIdx:obsEndIdx]
+                    tmpResults = tmpResults[modelStartIdx:modelEndIdx]
                     
                     if len(my_obs_data) > len(tmpResults):
                         my_obs_data = my_obs_data[:len(tmpResults)]
