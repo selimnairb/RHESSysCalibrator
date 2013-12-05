@@ -44,6 +44,7 @@ import logging
 import string
 from datetime import datetime
 from datetime import timedelta
+from collections import OrderedDict
 
 import math
 import numpy
@@ -118,14 +119,14 @@ class RHESSysCalibratorPostprocess(object):
         self.logger.addHandler(consoleHandler)
 
     @classmethod
-    def readObservedDataFromFile(cls, file, header=True, timeStep=TIME_STEP_DAILY):
+    def readObservedDataFromFile(cls, f, header=True, timeStep=TIME_STEP_DAILY, logger=None):
         """ Reads the data from the observed data file.  Assumes that
             there is one data point per line.  By default a daily timestep
             is assumed, but hourly is also supported; time step is used for
             calculating date for each datum.
             
             Arguments:
-            file -- file object  The text file to read from
+            f -- file object     The text file to read from
             header -- boolean    Specifies whether a header is present
                                   in the file.  If True, the first
                                   line of the file will read and used to
@@ -146,27 +147,29 @@ class RHESSysCalibratorPostprocess(object):
         delta = None
         
         if header:
-            headerData = file.readline().split()
+            headerData = f.readline().split()
             tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
                                int(headerData[2]), int(headerData[3]) )
+            if logger:
+                logger.debug("Observed timeseries begin date: %s" % (str(tmpDate),) )
             if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_DAILY:
                 delta = timedelta(days=1)
             else:
                 delta = timedelta(hours=1)
 
-        data = file.readline()
+        data = f.readline()
         while data:
             obs_data.append(float(data))
             if header:
                 date_list.append(tmpDate)
                 tmpDate = tmpDate + delta
             
-            data = file.readline()
+            data = f.readline()
 
         return (date_list, obs_data)
 
     @classmethod
-    def readColumnFromFile(cls, f, column_name, sep=" "):
+    def readColumnFromFile(cls, f, column_name, sep=" ", logger=None):
         """ Reads the specified column from the text file.  The file
             must have a header.  Reads dates/datetime from file by searching
             for headers with names of 'hour', 'day', 'month', 'year'
@@ -238,6 +241,100 @@ class RHESSysCalibratorPostprocess(object):
                 data = f.readline()
 
         return (date_list, col_data)
+
+    @classmethod
+    def readColumnsFromPatchDailyFile(cls, f, column_names, sep=" "):
+        """ Reads the specified columns of data from a RHESSys patch daily output 
+            file.  The file must have a header.  Reads dates/datetime from file by searching
+            for headers with names of 'hour', 'day', 'month', 'year'
+        
+            Arguments:
+            f -- file object  The text file to read from
+            column_names -- List of the names of the columns to return
+            sep -- The field separator (defaults to " ")
+
+            Returns collection.OrderedDict<datetime.datetime, dict<string, list<float>>, 
+            where the value dict for each datetime key uses column_name as its key.  
+            Returns An empty dict if data for the specified columns were not found.
+        """
+        returnDict = OrderedDict()
+
+        col_idx = {}
+        found = False
+
+        # Read the header line
+        header = f.readline().strip()
+        if ' ' == sep:
+            headers = string.split(header)
+        else:
+            headers = string.split(header, sep)
+        hour_idx = -1
+        day_idx = -1
+        month_idx = -1
+        year_idx = -1
+        # Find column_name in headers
+        for (counter, col) in enumerate(headers):
+            if col in column_names:
+                col_idx[col] = counter
+                found = True
+            elif col == RHESSysCalibratorPostprocess.HOUR_HEADER:
+                hour_idx = counter
+            elif col == RHESSysCalibratorPostprocess.DAY_HEADER:
+                day_idx = counter
+            elif col == RHESSysCalibratorPostprocess.MONTH_HEADER:
+                month_idx = counter
+            elif col == RHESSysCalibratorPostprocess.YEAR_HEADER:
+                year_idx = counter
+            
+        # We found column_name, read the data
+        if found:
+            data = f.readline().strip()
+            while data and data != '':
+                hour = day = month = year = None
+                if ' ' == sep:
+                    cols = string.split(data)
+                else:
+                    cols = string.split(data, sep)
+                if not len(cols): break;
+                # Get datetime
+                if hour_idx >= 0:
+                    hour = int(cols[hour_idx])
+                if day_idx >= 0:
+                    day = int(cols[day_idx])
+                if month_idx >= 0:
+                    month = int(cols[month_idx])
+                if year_idx >= 0:
+                    year = int(cols[year_idx])
+                # Construct date object
+                tmpDate = None
+                if hour and day and month and year:
+                    tmpDate = datetime(year, month, day, hour)
+                elif day and month and year:
+                    tmpDate = datetime(year, month, day, 1)
+                elif month and year:
+                    tmpDate = datetime(year, month, 1)
+                elif year:
+                    tmpDate = datetime(year, 12, 31)
+                    
+                try:
+                    dataForDate = returnDict[tmpDate]
+                except KeyError:
+                    dataForDate = {}
+                    returnDict[tmpDate] = dataForDate
+                 
+                # Get data
+                for key in col_idx:
+                    try:
+                        tmpData = dataForDate[key]
+                    except KeyError:
+                        tmpData = []
+                        dataForDate[key] = tmpData
+                    # TODO: intelligently handle different types    
+                    tmpData.append( float(cols[ col_idx[key] ]) )
+                
+                data = f.readline()
+
+        return (returnDict)
 
     @classmethod
     def logTransform(cls, list1, list2):
@@ -640,6 +737,10 @@ Run "%prog --help" for detailed description of all options
                           dest="startdate", 
                           help="[OPTIONAL] Date from which to start fitness calculations, of format YYYY M D H")
 
+        parser.add_option("--enddate", type=int, nargs=4,
+                          dest="enddate",
+                          help="[OPTIONAL] Date on which to end fitness calculationss, of format YYYY M D H")
+
         parser.add_option("-l", "--loglevel", action="store", type="string",
                           dest="loglevel", default="OFF",
                           help="[OPTIONAL] set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
@@ -692,12 +793,61 @@ Run "%prog --help" for detailed description of all options
 
         rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
 
+        # Read observed data from file
+        obsFile = open(obsFilePath, 'r')
+        (obs_datetime, obs_data) = \
+            RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile, logger=self.logger)
+        obsFile.close()
+        #self.logger.debug("Observed data: %s" % obs_data)
+
         startDate = None
+        endDate = None
         if options.startdate:
+            # Set start date based on command line
             startDate = datetime(options.startdate[0],
                                  options.startdate[1],
                                  options.startdate[2],
                                  options.startdate[3])
+        if options.enddate:
+            # Set end date based on command line
+            endDate = datetime(options.enddate[0],
+                               options.enddate[1],
+                               options.enddate[2],
+                               options.enddate[3])
+            if not endDate > startDate:
+                sys.exit("End date %s is not greater than start date %s" % \
+                         (str(endDate, str(startDate)) ) )
+        
+        if not startDate and not endDate:
+            # Set start and end dates based on observed data
+            startDate = obs_datetime[0]
+            endDate = obs_datetime[-1]
+
+        # Determine start and end indices
+        calibDays = None
+        if startDate and endDate:
+            delta = endDate - startDate
+            calibDays = delta.days
+            
+        obsStartIdx = None
+        obsEndIdx = None
+        if startDate:
+            for (counter, tmpDate) in enumerate(obs_datetime):
+                if tmpDate.hour == startDate.hour and \
+                    tmpDate.day == startDate.day and \
+                    tmpDate.month == startDate.month and \
+                    tmpDate.year == startDate.year:
+                    obsStartIdx = counter
+                    if calibDays:
+                        obsEndIdx = obsStartIdx + calibDays
+                    break
+        
+        if obsStartIdx:
+            self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
+                              (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
+        if obsEndIdx:
+            self.logger.debug("Obs end idx: %d, date: %s, value: %f" % 
+                          (obsEndIdx, str(obs_datetime[obsEndIdx]), obs_data[obsEndIdx] ) )
 
         try:
             calibratorDB = \
@@ -728,14 +878,6 @@ Run "%prog --help" for detailed description of all options
             if numRuns == 0:
                 raise Exception("No runs found for session %d" 
                                 % (session.id,))
-            
-            # Read observed data from file
-            obsFile = open(obsFilePath, 'r')
-            (obs_datetime, obs_data) = \
-                RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile)
-            obsFile.close()
-
-            self.logger.debug("Observed data: %s" % obs_data)
 
             runsProcessed = False
             for run in runs:
@@ -775,40 +917,44 @@ Run "%prog --help" for detailed description of all options
                     #   extent
                     my_obs_data = obs_data
                     if startDate:
-                        obsStartIdx = -1
-                        modelStartIdx = -1
-                        for (counter, tmpDate) in enumerate(obs_datetime):
-                            if tmpDate.hour == startDate.hour and \
-                                tmpDate.day == startDate.day and \
-                                tmpDate.month == startDate.month and \
-                                tmpDate.year == startDate.year:
-                                obsStartIdx = counter
-                                break
+                        modelStartIdx = None
+                        modelEndIdx = None
                         for (counter, tmpDate) in enumerate(model_datetime):
                             if tmpDate.hour == startDate.hour and \
                                 tmpDate.day == startDate.day and \
                                 tmpDate.month == startDate.month and \
                                 tmpDate.year == startDate.year:
                                 modelStartIdx = counter
+                                if calibDays:
+                                    modelEndIdx = modelStartIdx + calibDays
                                 break 
                         
                         self.logger.debug("Runid: %d" % (run.id,) )    
-                        self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
-                              (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
                         self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
                               (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
+                        if modelEndIdx:
+                            self.logger.debug("Model end idx: %d, date: %s, value: %f" %
+                                              (modelEndIdx, str(model_datetime[modelEndIdx]), tmpResults[modelEndIdx]) )
                             
-                        if obsStartIdx >= 0:
-                            my_obs_data = obs_data[obsStartIdx:]
-                        if modelStartIdx >= 0:
-                            tmpResults = tmpResults[modelStartIdx:]
+                        if obsStartIdx:
+                            if obsEndIdx:
+                                my_obs_data = obs_data[obsStartIdx:obsEndIdx]
+                            else:
+                                my_obs_data = obs_data[obsStartIdx:]
+                        if modelStartIdx:
+                            if modelEndIdx:
+                                tmpResults = tmpResults[modelStartIdx:modelEndIdx]
+                            else:
+                                tmpResults = tmpResults[modelStartIdx:]
                     
-                    if len(obs_data) > len(tmpResults):
-                        my_obs_data = obs_data[:len(tmpResults)]
-                        #my_log_obs_data = log_obs_data[:len(tmpResults)]
-                    elif len(obs_data) < len(tmpResults):
-                        tmpResults = tmpResults[:len(obs_data)]
+                    if len(my_obs_data) > len(tmpResults):
+                        my_obs_data = my_obs_data[:len(tmpResults)]
+                    elif len(my_obs_data) < len(tmpResults):
+                        tmpResults = tmpResults[:len(my_obs_data)]
                     assert(len(my_obs_data) == len(tmpResults))
+                    
+                    self.logger.debug("First obs value: %f, last: %f" % (my_obs_data[0], my_obs_data[-1]) )
+                    self.logger.debug("First modeled value: %f, last: %f" % (tmpResults[0], my_obs_data[-1]) )
                     
                     # Calculate NSE
                     my_nse = \
