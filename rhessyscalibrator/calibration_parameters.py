@@ -47,9 +47,9 @@ class CalibrationParametersProto(object):
                        'sv2':[1, 150],
                        'gw1':[0.001, 0.3],
                        'gw2':[0.01, 0.9],
-                       'vgsen1':[1, 1], # TODO: GET CORRECT RANGE?
-                       'vgsen2':[1, 3], 
-                       'vgsen3':[1, 1], # TODO: GET CORRECT RANGE?
+                       'vgsen1':[0.5, 2],
+                       'vgsen2':[0.5, 2], 
+                       'vgsen3':[1, 1],
                        'svalt1':[0.5, 2],
                        'svalt2':[0.5, 2]}
 
