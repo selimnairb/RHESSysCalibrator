@@ -48,6 +48,7 @@ from collections import OrderedDict
 
 import math
 import numpy
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
@@ -881,6 +882,10 @@ Run "%prog --help" for detailed description of all options
                           dest="enddate",
                           help="[OPTIONAL] Date on which to end fitness calculationss, of format YYYY M D H")
 
+        parser.add_option("-p", "--period",
+                          dest="period", choices=['daily', 'weekly', 'monthly'], default='daily',
+                          help="[OPTIONAL] Period over which fitness parameters will be calculated.")
+
         parser.add_option("-l", "--loglevel", action="store", type="string",
                           dest="loglevel", default="OFF",
                           help="[OPTIONAL] set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
@@ -950,7 +955,6 @@ Run "%prog --help" for detailed description of all options
         (obs_datetime, obs_data) = \
             RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile, logger=self.logger)
         obsFile.close()
-        #self.logger.debug("Observed data: %s" % obs_data)
 
         startDate = None
         endDate = None
@@ -1003,6 +1007,13 @@ Run "%prog --help" for detailed description of all options
                           (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
         self.logger.debug("Obs end idx: %d, date: %s, value: %f" % 
                       (obsEndIdx, str(obs_datetime[obsEndIdx]), obs_data[obsEndIdx] ) )
+
+        # Aggregate observed data as needed
+        obsTs = pd.Series(obs_data[obsStartIdx:obsEndIdx], index=obs_datetime[obsStartIdx:obsEndIdx])
+        if options.period == 'weekly':
+            obsTs = obsTs.resample('W-SUN', how='sum')
+        elif options.period == 'monthly':
+            obsTs = obsTs.resample('M', how='sum')
 
         try:
             calibratorDB = \
@@ -1065,11 +1076,9 @@ Run "%prog --help" for detailed description of all options
                                                                             "streamflow")
                         tmpResults = numpy.array(model_data)
                             
-                    self.logger.debug("Output file %s: %s" % (tmpOutfile, tmpResults))
                     tmpFile.close()
             
                     # Make sure observed and modeled data are of the same extent
-                    my_obs_data = obs_data
                     modelStartIdx = None
                     modelEndIdx = None
                     for (counter, tmpDate) in enumerate(model_datetime):
@@ -1093,9 +1102,16 @@ Run "%prog --help" for detailed description of all options
                           (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
                     self.logger.debug("Model end idx: %d, date: %s, value: %f" %
                                       (modelEndIdx, str(model_datetime[modelEndIdx]), tmpResults[modelEndIdx]) )
+                    
+                    # Aggregate modeled data as needed
+                    modelTs = pd.Series(tmpResults[modelStartIdx:modelEndIdx], index=model_datetime[modelStartIdx:modelEndIdx])
+                    if options.period == 'weekly':
+                        modelTs = modelTs.resample('W-SUN', how='sum')
+                    elif options.period == 'monthly':
+                        modelTs = modelTs.resample('M', how='sum')
                         
-                    my_obs_data = obs_data[obsStartIdx:obsEndIdx]
-                    tmpResults = tmpResults[modelStartIdx:modelEndIdx]
+                    my_obs_data = obsTs
+                    tmpResults = modelTs
                     
                     if len(my_obs_data) > len(tmpResults):
                         my_obs_data = my_obs_data[:len(tmpResults)]
@@ -1104,7 +1120,7 @@ Run "%prog --help" for detailed description of all options
                     assert(len(my_obs_data) == len(tmpResults))
                     
                     self.logger.debug("First obs value: %f, last: %f" % (my_obs_data[0], my_obs_data[-1]) )
-                    self.logger.debug("First modeled value: %f, last: %f" % (tmpResults[0], my_obs_data[-1]) )
+                    self.logger.debug("First modeled value: %f, last: %f" % (tmpResults[0], tmpResults[-1]) )
                     
                     # Calculate NSE
                     my_nse = \
@@ -1125,7 +1141,7 @@ Run "%prog --help" for detailed description of all options
                     
                     # Store fitness parameters for this run
                     calibratorDB.updateRunFitnessResults(run.id,
-                                                         'daily',
+                                                         options.period,
                                                          my_nse,
                                                          my_nse_log)
                     
@@ -1141,7 +1157,7 @@ Run "%prog --help" for detailed description of all options
                                                               options.observed_file)
                 
                 # Generate and save dotty plot
-                dottyFilename = "dotty_plots_SESSION_%s" % ( options.session_id, )
+                dottyFilename = "dotty_plots_SESSION_%s_%s" % ( options.session_id, options.period )
                 self.saveDottyPlot(outdirPath, dottyFilename, format='PNG', 
                                    sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
         except:

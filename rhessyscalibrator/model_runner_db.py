@@ -131,7 +131,7 @@ user1 REAL,
 user2 REAL,
 user3 REAL,
 fitness_period TEXT
-CHECK (fitness_period="daily" OR fitness_period="monthly" OR fitness_period="yearly" OR fitness_period=NULL)
+CHECK (fitness_period="daily" OR fitness_period="weekly" OR fitness_period="monthly" OR fitness_period="yearly" OR fitness_period=NULL)
 )
 """)
 
