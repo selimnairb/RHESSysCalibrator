@@ -1079,6 +1079,10 @@ Run "%prog --help" for detailed description of all options
                     tmpFile.close()
             
                     # Make sure observed and modeled data are of the same extent
+                    if calibDays > len(tmpResults):
+                        sys.exit("Calibration timeseries has %d values, but modeled data only has %d.\n" \
+                                 % ( calibDays, len(tmpResults) ) +
+                                 "You may have to specify an end date so that calibration and model time series align.")
                     modelStartIdx = None
                     modelEndIdx = None
                     for (counter, tmpDate) in enumerate(model_datetime):
@@ -1087,7 +1091,7 @@ Run "%prog --help" for detailed description of all options
                             tmpDate.month == startDate.month and \
                             tmpDate.year == startDate.year:
                             modelStartIdx = counter
-                            modelEndIdx = modelStartIdx + calibDays
+                            modelEndIdx = modelStartIdx + (calibDays - 1)
                             break 
                     
                     if modelStartIdx == None:
@@ -1100,6 +1104,7 @@ Run "%prog --help" for detailed description of all options
                     self.logger.debug("Runid: %d" % (run.id,) )    
                     self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
                           (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
+                    self.logger.debug("Model end idx: %d" % modelEndIdx)
                     self.logger.debug("Model end idx: %d, date: %s, value: %f" %
                                       (modelEndIdx, str(model_datetime[modelEndIdx]), tmpResults[modelEndIdx]) )
                     
