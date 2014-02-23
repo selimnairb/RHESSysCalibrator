@@ -50,6 +50,7 @@ import math
 import numpy
 import pandas as pd
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
@@ -99,10 +100,27 @@ class RHESSysCalibratorPostprocess(object):
                      PARAM_SVALT1_IDX, PARAM_SVALT2_IDX)
     NUM_PARAM_INDICES = len(PARAM_INDICES)
     
+    PARAM_NAMES = { 
+                   PARAM_S1_IDX: PARAM_S1_NAME,
+                   PARAM_S2_IDX: PARAM_S2_NAME,
+                   PARAM_S3_IDX: PARAM_S3_NAME,
+                   PARAM_SV1_IDX: PARAM_SV1_NAME,
+                   PARAM_SV2_IDX: PARAM_SV2_NAME,
+                   PARAM_GW1_IDX: PARAM_GW1_NAME,
+                   PARAM_GW2_IDX: PARAM_GW2_NAME,
+                   PARAM_VGSEN1_IDX: PARAM_VGSEN1_NAME,
+                   PARAM_VGSEN2_IDX: PARAM_VGSEN2_NAME,
+                   PARAM_VGSEN3_IDX: PARAM_VGSEN3_NAME,
+                   PARAM_SVALT1_IDX: PARAM_SVALT1_NAME,
+                   PARAM_SVALT2_IDX: PARAM_SVALT2_NAME
+                   }
+    
     def __init__(self):
         self.params = set()
         self.plotData = {}
         self.plotDataIdx = -1
+        self.numRuns = 0
+        self.numParams = -1
 
     def _initLogger(self, level):
         """ Setup logger.  Log to the console for now """
@@ -394,57 +412,70 @@ class RHESSysCalibratorPostprocess(object):
 
     
     def _storePerformanceDataForRun(self, run, data, performance):
+        self.numParams = -1
         if run.param_s1:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_S1_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 0] = run.param_s1
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S1_IDX, 1] = performance
         if run.param_s2:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_S2_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 0] = run.param_s2
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S2_IDX, 1] = performance
         if run.param_s3:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_S3_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 0] = run.param_s3
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_S3_IDX, 1] = performance
         if run.param_sv1:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_SV1_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 0] = run.param_sv1
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV1_IDX, 1] = performance
         if run.param_sv2:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_SV2_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 0] = run.param_sv2
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SV2_IDX, 1] = performance
         if run.param_gw1:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_GW1_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 0] = run.param_gw1
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW1_IDX, 1] = performance
         if run.param_gw2:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_GW2_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 0] = run.param_gw2
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_GW2_IDX, 1] = performance
         if run.param_vgsen1:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_VGSEN1_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN1_IDX, 0] = run.param_vgsen1
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN1_IDX, 1] = performance
         if run.param_vgsen2:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_VGSEN2_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN2_IDX, 0] = run.param_vgsen2
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN2_IDX, 1] = performance
         if run.param_vgsen3:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_VGSEN3_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN3_IDX, 0] = run.param_vgsen3
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_VGSEN3_IDX, 1] = performance
         if run.param_svalt1:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_SVALT1_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT1_IDX, 0] = run.param_svalt1
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT1_IDX, 1] = performance
         if run.param_svalt2:
+            self.numParams += 1
             self.params.add(RHESSysCalibratorPostprocess.PARAM_SVALT2_IDX)
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT2_IDX, 0] = run.param_svalt2
             data[self.plotDataIdx, RHESSysCalibratorPostprocess.PARAM_SVALT2_IDX, 1] = performance
     
     
-    def recordPlotDataForRun(self, run, numRuns, nse, nse_log, pbias=None, rsr=None, 
+    def recordPlotDataForRun(self, run, nse, nse_log, pbias=None, rsr=None, 
                              user1=None, user2=None, user3=None):
         """
             @param run rhessyscalibrator.model_runner_db.ModelRun
@@ -454,14 +485,14 @@ class RHESSysCalibratorPostprocess(object):
         try:
             data = self.plotData['nse']
         except KeyError:
-            data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+            data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
             self.plotData['nse'] = data
         self._storePerformanceDataForRun(run, data, nse)
         
         try:
             data = self.plotData['nse_log']
         except KeyError:
-            data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+            data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
             self.plotData['nse_log'] = data
         self._storePerformanceDataForRun(run, data, nse_log)
         
@@ -469,7 +500,7 @@ class RHESSysCalibratorPostprocess(object):
             try:
                 data = self.plotData['pbias']
             except KeyError:
-                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
                 self.plotData['pbias'] = data
             self._storePerformanceDataForRun(run, data, pbias)
             
@@ -477,7 +508,7 @@ class RHESSysCalibratorPostprocess(object):
             try:
                 data = self.plotData['rsr']
             except KeyError:
-                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
                 self.plotData['rsr'] = data
             self._storePerformanceDataForRun(run, data, rsr)
             
@@ -485,7 +516,7 @@ class RHESSysCalibratorPostprocess(object):
             try:
                 data = self.plotData['user1']
             except KeyError:
-                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
                 self.plotData['user1'] = data
             self._storePerformanceDataForRun(run, data, user1)
             
@@ -493,7 +524,7 @@ class RHESSysCalibratorPostprocess(object):
             try:
                 data = self.plotData['user2']
             except KeyError:
-                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
                 self.plotData['user2'] = data
             self._storePerformanceDataForRun(run, data, user2)
             
@@ -501,10 +532,142 @@ class RHESSysCalibratorPostprocess(object):
             try:
                 data = self.plotData['user3']
             except KeyError:
-                data = numpy.zeros( [numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
+                data = numpy.zeros( [self.numRuns, RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, 2] )
                 self.plotData['user3'] = data
             self._storePerformanceDataForRun(run, data, user3)
     
+   
+    def pair(self, data, figsize=None, dpi=80, labels=None, hist=False):
+        """ Generate something similar to R `pair` 
+            Adapted from http://stackoverflow.com/a/2690063/2026701
+        """
+    
+        nVariables = data.shape[1]
+        if labels is None:
+            labels = [RHESSysCalibratorPostprocess.PARAM_NAMES[i] for i in range(nVariables)]
+        fig = plt.figure(figsize=figsize, dpi=dpi)
+        for i in range(nVariables):
+            for j in range(nVariables):
+                nSub = i * nVariables + j + 1
+                ax = fig.add_subplot(nVariables, nVariables, nSub)
+                ax.tick_params(labelsize='xx-small')
+                ax.locator_params(axis='x', nbins=4)
+                if i == 0:
+                    ax.set_title(labels[j], fontsize='x-small')
+                if j == 0:
+                    ax.set_ylabel(labels[i], fontsize='x-small')
+                if i == j:
+                    if hist:
+                        ax.hist(data[:,i])
+                        ax.set_xlim(0, 1)
+                        ax.set_title(labels[i], fontsize='x-small')
+                    else:
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+                else:
+                    #ax.set_xlim(-1, 1)
+                    #ax.set_ylim(-1, 1)
+                    #ax.plot(data[:,i], data[:,j])
+                    ax.scatter(data[:,i], data[:,j], facecolors='none', edgecolors='blue', linewidth='0.5')
+    
+        plt.tight_layout(h_pad=0.1, w_pad=0.1)
+    
+        return fig
+    
+    
+    def pair3d(self, data, z, figsize=None, dpi=80, 
+               labels=None, zlabel=None, hist=False, surface=False,
+               title='Figure title'):
+        """ Generate something similar to R `pair` 
+            Adapted from http://stackoverflow.com/a/2690063/2026701
+        """
+    
+        nVariables = data.shape[0]
+        if labels is None:
+            labels = [RHESSysCalibratorPostprocess.PARAM_NAMES[i] for i in range(nVariables)]
+        fig = plt.figure(figsize=figsize, dpi=dpi)
+        plt.suptitle(title, y=0.99)
+        for i in range(nVariables):
+            for j in range(nVariables):
+                nSub = i * nVariables + j + 1
+                ax = fig.add_subplot(nVariables, nVariables, nSub, projection='3d')
+                ax.tick_params(labelsize='xx-small')
+                ax.locator_params(axis='x', nbins=4)
+                ax.locator_params(axis='y', nbins=4)
+                ax.locator_params(axis='z', nbins=4)
+                ax.set_xlabel('\n\n' + labels[i], fontsize='x-small')
+                ax.set_ylabel('\n\n' + labels[j], fontsize='x-small')
+                if j == nVariables - 1:
+                    ax.set_zlabel('\n\n' + zlabel, fontsize='x-small')
+                    #ax.text(0.5, 0.5, labels[i], rotation='vertical')
+                if i == j:
+                    if hist:
+                        ax.hist(data[:,i])
+                        ax.set_xlim(0, 1)
+                        ax.set_title(labels[i], fontsize='x-small')
+                    else:
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+                else:
+                    if surface:
+                        (X, Y) = numpy.meshgrid(data[i,:], data[j,:])
+                        (Z, Z) = numpy.meshgrid(z[i,:], z[j,:])
+                        ax.plot_surface(X, Y, Z)
+                    #ax.plot_surface()
+                    else:
+                        X = data[i,:]
+                        Y = data[j,:]
+                        Z = z[i,:]
+                        ax.scatter(X, Y, Z)
+    
+        plt.tight_layout(h_pad=1.3, w_pad=1.0)
+    
+        return fig
+    
+    
+    def saveCovariancePlot(self, outDir, filename, format='PDF', sizeX=1, sizeY=1, dpi=80):
+        """ Save covariance plots showing parameter relationships to outDir 
+            Potential reference: http://glowingpython.blogspot.com/2012/10/visualizing-correlation-matrices.html
+        """
+        assert( format in ['PDF', 'PNG'] )
+        if format == 'PDF':
+            plotFilename = "%s.pdf" % (filename,)
+        elif format == 'PNG':
+            plotFilename = "%s.png" % (filename,)
+
+        if 'nse' in self.plotData.keys():
+            
+            plotFilename = "nse_" + plotFilename
+            plotFilepath = os.path.join(outDir, plotFilename)
+                
+            data = self.plotData['nse']
+            # Data are stored as: data[numRuns,numParameters,2] 
+            #   WHERE data[numRuns,numParameters, 0] = value of parameters
+            #   AND data[numRuns,numParameters, 1] = value of performance criterion
+            #
+            # For numpy.cov input matrix m has:
+            #   variables in rows and observations in columns
+            # So the form must be:
+            # m = numpy.zeros( (RHESSysCalibratorPostprocess.NUM_PARAM_INDICES, self.numRuns) )
+            #     
+            param = numpy.transpose(data[:, 0:self.numParams+1, 0])
+            z = numpy.transpose(data[:, 0:self.numParams+1, 1])
+            fig = self.pair3d(param, z, figsize=(sizeX, sizeY), dpi=dpi, 
+                              zlabel='N-S efficiency', title='N-S efficiency for daily streamflow')
+            fig.savefig(plotFilepath, format=format, bbox_inches='tight', pad_inches=0.25)
+
+        if 'nse_log' in self.plotData.keys():
+            
+            plotFilename = "nse_log_" + plotFilename
+            plotFilepath = os.path.join(outDir, plotFilename)
+                
+            data = self.plotData['nse_log']
+            param = numpy.transpose(data[:, 0:self.numParams+1, 0])
+            z = numpy.transpose(data[:, 0:self.numParams+1, 1])
+            fig = self.pair3d(param, z, figsize=(sizeX, sizeY), dpi=dpi, 
+                              zlabel='N-S efficiency', title='N-S efficiency for log daily streamflow')
+            fig.savefig(plotFilepath, format=format, bbox_inches='tight', pad_inches=0.25)
+                
     
     def saveDottyPlot(self, outDir, filename, format='PDF', sizeX=1, sizeY=1, dpi=80):
         """ Save dotty plots showing parameter sensitivity to outDir 
@@ -1040,8 +1203,8 @@ Run "%prog --help" for detailed description of all options
                 
             # Get runs in session
             runs = calibratorDB.getRunsInSession(session.id)
-            numRuns = len(runs) 
-            if numRuns == 0:
+            self.numRuns = len(runs) 
+            if self.numRuns == 0:
                 raise Exception("No runs found for session %d" 
                                 % (session.id,))
 
@@ -1151,7 +1314,7 @@ Run "%prog --help" for detailed description of all options
                                                          my_nse_log)
                     
                     # Store performance parameters for this run so we can plot later
-                    self.recordPlotDataForRun(run, numRuns, my_nse, my_nse_log)
+                    self.recordPlotDataForRun(run, my_nse, my_nse_log)
                     
                     runsProcessed = True
 
@@ -1165,6 +1328,13 @@ Run "%prog --help" for detailed description of all options
                 dottyFilename = "dotty_plots_SESSION_%s_%s" % ( options.session_id, options.period )
                 self.saveDottyPlot(outdirPath, dottyFilename, format='PNG', 
                                    sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
+                
+                # Generate and save covariance plot
+                covFilename = "cov_plots_SESSION_%s_%s" % ( options.session_id, options.period )
+                self.saveCovariancePlot(outdirPath, covFilename, format='PNG', 
+                                        sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
+                
+               
         except:
             raise
         else:
