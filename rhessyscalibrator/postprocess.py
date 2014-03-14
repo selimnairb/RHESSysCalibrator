@@ -167,15 +167,17 @@ class RHESSysCalibratorPostprocess(object):
         
         if header:
             headerData = f.readline().split()
-            tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
-                               int(headerData[2]), int(headerData[3]) )
+            if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_HOURLY:
+                tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
+                                   int(headerData[2]), int(headerData[3]) )
+                delta = timedelta(hours=1)
+            else:
+                tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
+                                   int(headerData[2]) )
+                delta = timedelta(days=1)
             if logger:
                 logger.debug("Observed timeseries begin date: %s" % (str(tmpDate),) )
-            if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_DAILY:
-                delta = timedelta(days=1)
-            else:
-                delta = timedelta(hours=1)
-
+           
         data = f.readline()
         while data:
             obs_data.append(float(data))
@@ -301,7 +303,7 @@ class RHESSysCalibratorPostprocess(object):
                 if hour and day and month and year:
                     tmpDate = datetime(year, month, day, hour)
                 elif day and month and year:
-                    tmpDate = datetime(year, month, day, 1)
+                    tmpDate = datetime(year, month, day)
                 elif month and year:
                     tmpDate = datetime(year, month, 1)
                 elif year:
