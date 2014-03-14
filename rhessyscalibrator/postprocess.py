@@ -188,6 +188,57 @@ class RHESSysCalibratorPostprocess(object):
         return (date_list, obs_data)
 
     @classmethod
+    def readColumnsFromFile(cls, f, column_names, sep=' ', logger=None):
+        """ Reads the specified columns from the text file.  The file
+            must have a header.  Reads dates/datetime from file by searching
+            for headers with names of 'hour', 'day', 'month', 'year'
+        
+            Arguments:
+            f -- file object  The text file to read from
+            column_names -- A list of column names to return
+            sep -- The field separator (defaults to ' ')
+
+            Returns Pandas DataFrame object indexed by date
+            
+            Raises exception if data file does not include year, month, and day fields
+        """
+        cols = column_names + [RHESSysCalibratorPostprocess.HOUR_HEADER, 
+                 RHESSysCalibratorPostprocess.DAY_HEADER, 
+                 RHESSysCalibratorPostprocess.MONTH_HEADER, 
+                 RHESSysCalibratorPostprocess.YEAR_HEADER]
+        df = pd.read_csv(f, sep=' ', usecols=cols)
+        # Build index
+        time_stamps = None
+        try:
+            time_stamps = df[RHESSysCalibratorPostprocess.DAY_HEADER].apply(str)
+            df = df.drop(RHESSysCalibratorPostprocess.DAY_HEADER, 1)
+        except KeyError:
+            raise Exception('Data file lacks day column')
+        try:
+            time_stamps += '/' + df[RHESSysCalibratorPostprocess.MONTH_HEADER].apply(str)
+            df = df.drop(RHESSysCalibratorPostprocess.MONTH_HEADER, 1)
+        except KeyError:
+            raise Exception('Data file lacks month column')
+        try:
+            time_stamps += '/' + df[RHESSysCalibratorPostprocess.YEAR_HEADER].apply(str)
+            df = df.drop(RHESSysCalibratorPostprocess.YEAR_HEADER, 1)
+        except KeyError:
+            raise Exception('Data file lacks year column')
+        try:
+            time_stamps += ' ' + df[RHESSysCalibratorPostprocess.HOUR_HEADER].apply(str) + '00:00'
+            df = df.drop(RHESSysCalibratorPostprocess.HOUR_HEADER, 1)
+        except KeyError:
+            pass
+        
+        dates = [pd.to_datetime(date) for date in time_stamps]
+        datesDf = pd.DataFrame(dates, columns=['datetime'])
+        
+        df = datesDf.join(df, how='inner')
+        df = df.set_index('datetime')
+        return df
+   
+
+    @classmethod
     def readColumnFromFile(cls, f, column_name, sep=" ", logger=None):
         """ Reads the specified column from the text file.  The file
             must have a header.  Reads dates/datetime from file by searching
