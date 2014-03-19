@@ -212,20 +212,20 @@ class RHESSysCalibratorPostprocess(object):
         # Build index
         time_stamps = None
         try:
-            time_stamps = df[RHESSysCalibratorPostprocess.DAY_HEADER].apply(str)
-            df = df.drop(RHESSysCalibratorPostprocess.DAY_HEADER, 1)
+            time_stamps = df[RHESSysCalibratorPostprocess.YEAR_HEADER].apply(str)
+            df = df.drop(RHESSysCalibratorPostprocess.YEAR_HEADER, 1)
         except KeyError:
-            raise Exception('Data file lacks day column')
+            raise Exception('Data file lacks year column')
         try:
             time_stamps += '/' + df[RHESSysCalibratorPostprocess.MONTH_HEADER].apply(str)
             df = df.drop(RHESSysCalibratorPostprocess.MONTH_HEADER, 1)
         except KeyError:
             raise Exception('Data file lacks month column')
         try:
-            time_stamps += '/' + df[RHESSysCalibratorPostprocess.YEAR_HEADER].apply(str)
-            df = df.drop(RHESSysCalibratorPostprocess.YEAR_HEADER, 1)
+            time_stamps += '/' + df[RHESSysCalibratorPostprocess.DAY_HEADER].apply(str)
+            df = df.drop(RHESSysCalibratorPostprocess.DAY_HEADER, 1)
         except KeyError:
-            raise Exception('Data file lacks year column')
+            raise Exception('Data file lacks day column')
         try:
             time_stamps += ' ' + df[RHESSysCalibratorPostprocess.HOUR_HEADER].apply(str) + '00:00'
             df = df.drop(RHESSysCalibratorPostprocess.HOUR_HEADER, 1)
