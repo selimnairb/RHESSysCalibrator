@@ -138,7 +138,8 @@ class RHESSysCalibratorPostprocess(object):
         self.logger.addHandler(consoleHandler)
 
     @classmethod
-    def readObservedDataFromFile(cls, f, header=True, timeStep=TIME_STEP_DAILY, logger=None):
+    def readObservedDataFromFile(cls, f, header=True, timeStep=TIME_STEP_DAILY, logger=None,
+                                 readHour=True):
         """ Reads the data from the observed data file.  Assumes that
             there is one data point per line.  By default a daily timestep
             is assumed, but hourly is also supported; time step is used for
@@ -153,6 +154,7 @@ class RHESSysCalibratorPostprocess(object):
                                   Date is assumed to be in the format:
                                   "YYYY M D H"
             timeStep -- string   One of RHESSysCalibratorPostprocess.TIME_STEPS
+            readHour -- boolean  Control whether the hour should be read from the file header
         
             Returns tuple (list<datetime.datetime>, list<float>)
             Returns tuple (empty list, list<float>) if header is false  
@@ -167,13 +169,16 @@ class RHESSysCalibratorPostprocess(object):
         
         if header:
             headerData = f.readline().split()
-            if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_HOURLY:
+            if readHour:
                 tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
                                    int(headerData[2]), int(headerData[3]) )
-                delta = timedelta(hours=1)
             else:
                 tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
                                    int(headerData[2]) )
+                
+            if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_HOURLY:
+                delta = timedelta(hours=1)
+            else:
                 delta = timedelta(days=1)
             if logger:
                 logger.debug("Observed timeseries begin date: %s" % (str(tmpDate),) )
@@ -241,7 +246,7 @@ class RHESSysCalibratorPostprocess(object):
    
 
     @classmethod
-    def readColumnFromFile(cls, f, column_name, sep=" ", logger=None):
+    def readColumnFromFile(cls, f, column_name, sep=" ", logger=None, startHour=1):
         """ Reads the specified column from the text file.  The file
             must have a header.  Reads dates/datetime from file by searching
             for headers with names of 'hour', 'day', 'month', 'year'
@@ -250,6 +255,7 @@ class RHESSysCalibratorPostprocess(object):
             f -- file object  The text file to read from
             column_name -- The name of the column to return
             sep -- The field separator (defaults to " ")
+            startHour -- Hour to use for daily data
 
             Returns tuple (list<datetime.datetime>, list<float>).  
             Returns tuple of empty lists if the column had no data, or if the column was
@@ -303,7 +309,7 @@ class RHESSysCalibratorPostprocess(object):
                 if hour and day and month and year:
                     tmpDate = datetime(year, month, day, hour)
                 elif day and month and year:
-                    tmpDate = datetime(year, month, day)
+                    tmpDate = datetime(year, month, day, startHour)
                 elif month and year:
                     tmpDate = datetime(year, month, 1)
                 elif year:
