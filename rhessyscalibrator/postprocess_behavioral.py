@@ -38,10 +38,13 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os, sys, errno
 import argparse
 import logging
+from datetime import datetime
 
 import math
 import numpy
+import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
 
 from rhessyscalibrator.postprocess import RHESSysCalibratorPostprocess
 from rhessyscalibrator.calibrator import RHESSysCalibrator
@@ -53,7 +56,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
     
     def saveUncertaintyBoundsPlot(self, outDir, filename, lowerBound, upperBound,
                                   format='PDF', log=False, xlabel=None, ylabel=None,
-                                  title=None):
+                                  title=None, plotObs=True, plotMean=False, plotColor=False,
+                                  sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -72,8 +76,16 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         assert( self.x is not None )
         assert( self.ysim is not None )
         
-        # Line up start of observed and modeled timeseries
-        # self.obs_datetime, self.obs_data
+        if plotColor:
+            minYcolor = '0.5'
+            maxYcolor = '0.25'
+            obs_color = 'blue'
+            mean_color = 'yellow'
+        else:
+            minYcolor = '0.5'
+            maxYcolor = '0.25'
+            obs_color = 'black'
+            mean_color = '0.75'
         
         # Normalize likelihood to have values from 0 to 1
         normLH = self.likelihood / numpy.sum(self.likelihood)
@@ -85,6 +97,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         nIters = numpy.shape(self.ysim)[1]
         minYsim = numpy.zeros(nIters)
         maxYsim = numpy.zeros(nIters)
+        meanYsim = numpy.zeros(nIters)
 
         # Generate uncertainty interval bounded by lower bound and upper bound
         for i in xrange(0, nIters):
@@ -99,32 +112,58 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             validYsim = sortYsim[cond]
             minYsim[i] = validYsim[0]
             maxYsim[i] = validYsim[-1]
+            meanYsim[i] = validYsim.mean()
             
         # Plot it up
-        fig = plt.figure()
-        plt.xticks(rotation=45)
-        # Draw lower and upper uncertainty lines
-        if log:
-            Y1 = numpy.log10(minYsim)
-            Y2 = numpy.log10(maxYsim)
-            Y3 = numpy.log10(self.obs_data)
-        else:
-            Y1 = minYsim
-            Y2 = maxYsim
-            Y3 = self.obs_data
-        plt.plot(self.x, Y1, color='0.5', linestyle='solid')
-        plt.plot(self.x, Y2, color='0.5', linestyle='solid')
+        fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
+        ax = fig.add_subplot(111)
+        
+        data_plt = []
+        legend_items = []
+        (p, ) = ax.plot(self.x, minYsim, color=minYcolor, linestyle='solid')
+        data_plt.append(p)
+        legend_items.append('95th percentile - lower')
+        (p, ) = ax.plot(self.x, maxYsim, color=maxYcolor, linestyle='solid') 
+        data_plt.append(p)
+        legend_items.append('95th percentile - upper')
         # Draw observed line
-        plt.plot(self.obs_datetime, Y3, color='black', linestyle='solid')
+        if plotObs:
+            (p, ) = ax.plot(self.x, self.obs, color=obs_color, linestyle='solid')
+            data_plt.append(p)
+            legend_items.append('Observed data')
+        if plotMean:
+            (p, ) = ax.plot(self.x, meanYsim, color=mean_color, linestyle='solid')
+            data_plt.append(p)
+            legend_items.append('Mean')
         # Draw shaded uncertainty envelope
-        plt.fill_between(self.x, Y1, Y2, color='0.8')
-        # Set labels and title
+        ax.fill_between(self.x, minYsim, maxYsim, color='0.9')
+        
+        # Annotations
+        # X-axis
+        quarterly = matplotlib.dates.MonthLocator(interval=3)
+        ax.xaxis.set_major_locator(quarterly)
+        ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%b-%Y') )
+        # Rotate
+        plt.setp( ax.xaxis.get_majorticklabels(), rotation=45 )
+        plt.setp( ax.xaxis.get_majorticklabels(), fontsize='xx-small' )
+        
+        if log:
+            ax.set_yscale('log')
+        
         if xlabel:
-            plt.xlabel(xlabel)
+            ax.set_xlabel(xlabel)
         if ylabel:
-            plt.ylabel(ylabel)
+            ax.set_ylabel(ylabel)
         if title:
-            plt.suptitle(title)
+            fig.suptitle(title, y=0.99)
+            
+        # Plot legend last
+        legend = ax.legend( data_plt, legend_items, 'upper left', fontsize='x-small', 
+                            ncol=len(legend_items)/2, frameon=True )
+        frame = legend.get_frame()
+        frame.set_facecolor('0.9')
+        frame.set_alpha(0.5)
+            
         # Save the figure
         fig.savefig(plotFilepath, format=format, bbox_inches='tight', pad_inches=0.25)
         
@@ -176,6 +215,21 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                             dest="behavioral_filter", required=False,
                             default="nse>0.5 and nse_log>0.5",
                             help="SQL where clause to use to determine which runs qualify as behavioral parameters.  E.g. 'nse>0.5 AND nse_log>0.5' (use quotes)")
+
+        parser.add_argument("--supressObs", action="store_true", required=False, default=False,
+                            help="Do not plot observered data")
+
+        parser.add_argument("--plotMean", action="store_true", required=False, default=False,
+                            help="Plot mean value of behavioral runs")
+
+        parser.add_argument("--color", action="store_true", required=False, default=False,
+                            help="Plot in color")
+        
+        parser.add_argument('--figureX', required=False, type=int, default=4,
+                            help='The width of the plot, in inches')
+    
+        parser.add_argument('--figureY', required=False, type=int, default=3,
+                            help='The height of the plot, in inches')
 
         parser.add_argument("-l", "--loglevel", action="store",
                             dest="loglevel", default="OFF",
@@ -261,6 +315,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             (self.obs_datetime, self.obs_data) = \
                 RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile)
             obsFile.close()
+            obs = pd.Series(self.obs_data, index=self.obs_datetime)
 
             self.logger.debug("Observed data: %s" % self.obs_data)
             
@@ -282,19 +337,29 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     
                     tmpFile = open(tmpOutfile, 'r')
                     
-                    (model_datetime, model_data) = \
+                    (tmp_datetime, tmp_data) = \
                             RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
                                                                             "streamflow")
+                    tmp_mod = pd.Series(tmp_data, index=tmp_datetime)
+                    # Align timeseries to observed
+                    (mod, self.obs) = tmp_mod.align(obs, join='inner')
+                    
+                    #import pdb; pdb.set_trace()
+                    
                     # Stash date for X values (assume they are the same for all runs
                     if self.x == None:
-                        self.x = numpy.array(model_datetime)
+                        #self.x = numpy.array(mod.index)
+                        self.x = [datetime.strptime(str(d), '%Y-%m-%d %H:%M:%S') for d in mod.index]
+                        
+                    #import pdb; pdb.set_trace()    
+                    
                     # Put data in matrix
-                    dataLen = len(model_data)
+                    dataLen = len(mod)
                     if self.ysim == None:
                         # Allocate matrix for results
                         self.ysim = numpy.empty( (numRuns, dataLen) )
                     assert( numpy.shape(self.ysim)[1] == dataLen )
-                    self.ysim[i,] = model_data
+                    self.ysim[i,] = mod
                     
                     # Store fitness parameter
                     self.likelihood[i] = run.nse
@@ -303,18 +368,32 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     runsProcessed = True
                     
             if runsProcessed:
-                # Generate visualization
-                behavioralFilename = "behavioral_SESSION_%s" % ( options.session_id, ) 
+                behavioralFilename = 'behavioral'
+                if options.supressObs:
+                    behavioralFilename += '_noObs'
+                if options.plotMean:
+                    behavioralFilename += '_mean'
+                if options.color:
+                    behavioralFilename += '_color'
+                behavioralFilename += "_SESSION_%s" % ( options.session_id, )
+                # Generate visualizations
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=False,
                                                ylabel=r'Streamflow (mm)',
-                                               title=options.title)
-                
-                behavioralFilename = "behavioral-log_SESSION_%s" % ( options.session_id, ) 
+                                               title=options.title, 
+                                               plotObs=(not options.supressObs),
+                                               plotMean=options.plotMean,
+                                               plotColor=options.color,
+                                               sizeX=options.figureX, sizeY=options.figureY )
+                behavioralFilename += '-log'
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=True,
                                                ylabel=r'$Log_{10}$(Streamflow) (mm)',
-                                               title=options.title)
+                                               title=options.title,
+                                               plotObs=(not options.supressObs),
+                                               plotMean=options.plotMean,
+                                               plotColor=options.color,
+                                               sizeX=options.figureX, sizeY=options.figureY )
         except:
             raise
         else:
