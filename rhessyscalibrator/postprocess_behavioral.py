@@ -50,13 +50,60 @@ from rhessyscalibrator.postprocess import RHESSysCalibratorPostprocess
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
 
+
+def calculateUncertaintyBounds(ysim, likelihood, lowerBound, upperBound):
+    """ Calculate uncertainty bounds for matrix of simulated values
+    
+        @param ysim Numpy array containing a vector of data for a number of simuations,
+          dimensions [NUM_SIMULATIONS, NUM_DATA_PER_SIMULATION]
+        @param likelihood Numpy array containing model fitness parameter for each
+          simulation, dimensions [NUM_SIMULATIONS]
+        @param lowerBound Double representing percentile of lower bound of confidence interval (e.g. 2.5)
+        @param upperBound Double representing percentile of upper bound of confidence interval (e.g. 97.5)
+        
+        @return Tuple of numpy arrays representing minYsim, maxYsim, and medianYsim, dimensions
+          [NUM_DATA_PER_SIMULATION]  
+    """
+    assert( lowerBound < 100.0 and lowerBound > 0.0)
+    assert( upperBound < 100.0 and upperBound > 0.0)
+    assert( lowerBound < upperBound )
+    
+    # Normalize likelihood to have values from 0 to 1
+    normLH = likelihood / numpy.sum(likelihood)
+    
+    lower = lowerBound / 100.0
+    upper = upperBound / 100.0
+
+    nIters = numpy.shape(ysim)[1]
+    minYsim = numpy.zeros(nIters)
+    maxYsim = numpy.zeros(nIters)
+    medianYsim = numpy.zeros(nIters)
+
+    # Generate uncertainty interval bounded by lower bound and upper bound
+    for i in xrange(0, nIters):
+        ys = ysim[:,i]
+        # Use CDF of likelihood values as basis for interval
+        sortedIdx = numpy.argsort(ys)
+        sortYsim = ys[sortedIdx]
+        sortLH = normLH[sortedIdx]
+        cumLH = numpy.cumsum(sortLH)
+        cond = (cumLH > lower) & (cumLH < upper)
+            
+        validYsim = sortYsim[cond]
+        minYsim[i] = validYsim[0]
+        maxYsim[i] = validYsim[-1]
+        medianYsim[i] = numpy.median(validYsim)
+        
+    return (minYsim, maxYsim, medianYsim)
+
+
 class RHESSysCalibratorPostprocessBehavioral(object):
     """ Main driver class for rhessys_calibrator_postprocess_behavioral tool
     """
     
     def saveUncertaintyBoundsPlot(self, outDir, filename, lowerBound, upperBound,
                                   format='PDF', log=False, xlabel=None, ylabel=None,
-                                  title=None, plotObs=True, plotMean=False, plotColor=False,
+                                  title=None, plotObs=True, plotMedian=False, plotColor=False,
                                   legend=True, sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
@@ -70,9 +117,6 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             plotFilename = "%s.png" % (filename,)
         plotFilepath = os.path.join(outDir, plotFilename)
         
-        assert( lowerBound < 100.0 and lowerBound > 0.0)
-        assert( upperBound < 100.0 and upperBound > 0.0)
-        assert( lowerBound < upperBound )
         assert( self.x is not None )
         assert( self.ysim is not None )
         
@@ -85,32 +129,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             obs_color = 'black'
             mean_color = '0.75'
         
-        # Normalize likelihood to have values from 0 to 1
-        normLH = self.likelihood / numpy.sum(self.likelihood)
-        
-        lower = lowerBound / 100.0
-        upper = upperBound / 100.0
-        
         # Get the uncertainty boundary
-        nIters = numpy.shape(self.ysim)[1]
-        minYsim = numpy.zeros(nIters)
-        maxYsim = numpy.zeros(nIters)
-        meanYsim = numpy.zeros(nIters)
-
-        # Generate uncertainty interval bounded by lower bound and upper bound
-        for i in xrange(0, nIters):
-            ys = self.ysim[:,i]
-            # Use CDF of likelihood values as basis for interval
-            sortedIdx = numpy.argsort(ys)
-            sortYsim = ys[sortedIdx]
-            sortLH = normLH[sortedIdx]
-            cumLH = numpy.cumsum(sortLH)
-            cond = (cumLH > lower) & (cumLH < upper)
-            
-            validYsim = sortYsim[cond]
-            minYsim[i] = validYsim[0]
-            maxYsim[i] = validYsim[-1]
-            meanYsim[i] = validYsim.mean()
+        (minYsim, maxYsim, medianYsim) = calculateUncertaintyBounds(self.ysim, self.likelihood,
+                                                                    lowerBound, upperBound)
             
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
@@ -123,10 +144,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             (p, ) = ax.plot(self.x, self.obs, color=obs_color, linestyle='solid')
             data_plt.append(p)
             legend_items.append('Observed data')
-        if plotMean:
-            (p, ) = ax.plot(self.x, meanYsim, color=mean_color, linestyle='solid')
+        if plotMedian:
+            (p, ) = ax.plot(self.x, medianYsim, color=mean_color, linestyle='solid')
             data_plt.append(p)
-            legend_items.append('Mean')
+            legend_items.append('Median')
         # Draw shaded uncertainty envelope
         ax.fill_between(self.x, minYsim, maxYsim, color=fillColor)
         
@@ -176,6 +197,117 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         # add consoleHandler to logger
         self.logger.addHandler(consoleHandler)
         
+        
+    def readBehavioralData(self, basedir, session_id, variable='streamflow',
+                           observed_file=None, behavioral_filter=None):
+        
+        dbPath = RHESSysCalibrator.getDBPath(basedir)
+        if not os.access(dbPath, os.R_OK):
+            raise IOError(errno.EACCES, "The database at %s is not readable" %
+                          dbPath)
+        self.logger.debug("DB path: %s" % dbPath)
+        
+        outputPath = RHESSysCalibrator.getOutputPath(basedir)
+        if not os.access(outputPath, os.R_OK):
+            raise IOError(errno.EACCES, "The output directory %s is  not readable" % outputPath)
+        self.logger.debug("Output path: %s" % outputPath)
+
+        rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
+        
+        calibratorDB = \
+            ModelRunnerDB(RHESSysCalibrator.getDBPath(
+                basedir))
+        
+        # Make sure the session exists
+        session = calibratorDB.getSession(session_id)
+        if None == session:
+            raise Exception("Session %d was not found in the calibration database %s" % (session_id, dbPath))
+        if session.status != "complete":
+            print "WARNING: session status is: %s.  Some model runs may not have completed." % (session.status,)
+        else:
+            self.logger.debug("Session status is: %s" % (session.status,))
+        
+        # Determine observation file path
+        if observed_file:
+            obs_file = observed_file
+        else:
+            # Get observered file from session
+            assert( session.obs_filename != None )
+            obs_file = session.obs_filename
+        obsPath = RHESSysCalibrator.getObsPath(basedir)
+        obsFilePath = os.path.join(obsPath, obs_file)
+        if not os.access(obsFilePath, os.R_OK):
+            raise IOError(errno.EACCES, "The observed data file %s is  not readable" % obsFilePath)
+        self.logger.debug("Obs path: %s" % obsFilePath)
+        
+        # Get runs in session
+        runs = calibratorDB.getRunsInSession(session.id, where_clause=behavioral_filter)
+        numRuns = len(runs) 
+        if numRuns == 0:
+            raise Exception("No runs found for session %d" 
+                            % (session.id,))
+        response = raw_input("%d runs selected for plotting from session %d, continue? [yes | no] " % \
+                            (numRuns, session_id ) )
+        response = response.lower()
+        if response != 'y' and response != 'yes':
+            # Exit normally
+            return 0
+        self.logger.debug("%d behavioral runs" % (numRuns,) )
+        
+        # Read observed data from file
+        obsFile = open(obsFilePath, 'r')
+        (obs_datetime, obs_data) = \
+            RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile)
+        obsFile.close()
+        obs = pd.Series(obs_data, index=obs_datetime)
+        
+        self.logger.debug("Observed data: %s" % obs_data)
+        
+        likelihood = numpy.empty(numRuns)
+        ysim = None
+        x = None
+        
+        runsProcessed = False
+        for (i, run) in enumerate(runs):
+            if "DONE" == run.status:
+                runOutput = os.path.join(rhessysPath, run.output_path)
+                self.logger.debug(">>>\nOutput dir of run %d is %s" %
+                                     (run.id, runOutput))
+                tmpOutfile = \
+                    RHESSysCalibrator.getRunOutputFilePath(runOutput)
+                if not os.access(tmpOutfile, os.R_OK):
+                    print "Output file %s for run %d not found or not readable, unable to calculate fitness statistics for this run" % (tmpOutfile, run.id)
+                    continue
+                
+                tmpFile = open(tmpOutfile, 'r')
+                
+                (tmp_datetime, tmp_data) = \
+                        RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
+                                                                        "streamflow")
+                tmp_mod = pd.Series(tmp_data, index=tmp_datetime)
+                # Align timeseries to observed
+                (mod, obs) = tmp_mod.align(obs, join='inner')
+                                 
+                # Stash date for X values (assume they are the same for all runs
+                if x == None:
+                    x = [datetime.strptime(str(d), '%Y-%m-%d %H:%M:%S') for d in mod.index]
+        
+                # Put data in matrix
+                dataLen = len(mod)
+                if ysim == None:
+                    # Allocate matrix for results
+                    ysim = numpy.empty( (numRuns, dataLen) )
+                assert( numpy.shape(ysim)[1] == dataLen )
+                ysim[i,] = mod
+                
+                # Store fitness parameter
+                likelihood[i] = run.nse
+                        
+                tmpFile.close()                
+                runsProcessed = True
+        
+        return (runsProcessed, obs, x, ysim, likelihood)
+    
     
     def main(self, args):
         # Set up command line options
@@ -212,7 +344,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         parser.add_argument("--supressObs", action="store_true", required=False, default=False,
                             help="Do not plot observered data")
 
-        parser.add_argument("--plotMean", action="store_true", required=False, default=False,
+        parser.add_argument("--plotMedian", action="store_true", required=False, default=False,
                             help="Plot mean value of behavioral runs")
 
         parser.add_argument("--color", action="store_true", required=False, default=False,
@@ -252,123 +384,17 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
         outdirPath = os.path.abspath(options.outdir)
 
-        dbPath = RHESSysCalibrator.getDBPath(basedir)
-        if not os.access(dbPath, os.R_OK):
-            raise IOError(errno.EACCES, "The database at %s is not readable" %
-                          dbPath)
-        self.logger.debug("DB path: %s" % dbPath)
-        
-        outputPath = RHESSysCalibrator.getOutputPath(basedir)
-        if not os.access(outputPath, os.R_OK):
-            raise IOError(errno.EACCES, "The output directory %s is  not readable" % outputPath)
-        self.logger.debug("Output path: %s" % outputPath)
-
-        rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
-        
         try:
-            calibratorDB = \
-                ModelRunnerDB(RHESSysCalibrator.getDBPath(
-                    basedir))
-        
-            # Make sure the session exists
-            session = calibratorDB.getSession(options.session_id)
-            if None == session:
-                raise Exception("Session %d was not found in the calibration database %s" % (options.session_id, dbPath))
-            if session.status != "complete":
-                print "WARNING: session status is: %s.  Some model runs may not have completed." % (session.status,)
-            else:
-                self.logger.debug("Session status is: %s" % (session.status,))
-        
-            # Deterine observation file path
-            if options.observed_file:
-                obs_file = options.observed_file
-            else:
-                # Get observered file from session
-                assert( session.obs_filename != None )
-                obs_file = session.obs_filename
-            obsPath = RHESSysCalibrator.getObsPath(basedir)
-            obsFilePath = os.path.join(obsPath, obs_file)
-            if not os.access(obsFilePath, os.R_OK):
-                raise IOError(errno.EACCES, "The observed data file %s is  not readable" % obsFilePath)
-            self.logger.debug("Obs path: %s" % obsFilePath)
+            (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
+                self.readBehavioralData(basedir, options.session_id, 'streamflow',
+                                        options.observed_file, options.behavioral_filter)
             
-            # Get runs in session
-            runs = calibratorDB.getRunsInSession(session.id, where_clause=options.behavioral_filter)
-            numRuns = len(runs) 
-            if numRuns == 0:
-                raise Exception("No runs found for session %d" 
-                                % (session.id,))
-            response = raw_input("%d runs selected for plotting from session %d, continue? [yes | no] " % \
-                                (numRuns, options.session_id ) )
-            response = response.lower()
-            if response != 'y' and response != 'yes':
-                # Exit normally
-                return 0
-            self.logger.debug("%d behavioral runs" % (numRuns,) )
-            
-            # Read observed data from file
-            obsFile = open(obsFilePath, 'r')
-            (self.obs_datetime, self.obs_data) = \
-                RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile)
-            obsFile.close()
-            obs = pd.Series(self.obs_data, index=self.obs_datetime)
-
-            self.logger.debug("Observed data: %s" % self.obs_data)
-            
-            self.likelihood = numpy.empty(numRuns)
-            self.ysim = None
-            self.x = None
-            
-            runsProcessed = False
-            for (i, run) in enumerate(runs):
-                if "DONE" == run.status:
-                    runOutput = os.path.join(rhessysPath, run.output_path)
-                    self.logger.debug(">>>\nOutput dir of run %d is %s" %
-                                         (run.id, runOutput))
-                    tmpOutfile = \
-                        RHESSysCalibrator.getRunOutputFilePath(runOutput)
-                    if not os.access(tmpOutfile, os.R_OK):
-                        print "Output file %s for run %d not found or not readable, unable to calculate fitness statistics for this run" % (tmpOutfile, run.id)
-                        continue
-                    
-                    tmpFile = open(tmpOutfile, 'r')
-                    
-                    (tmp_datetime, tmp_data) = \
-                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
-                                                                            "streamflow")
-                    tmp_mod = pd.Series(tmp_data, index=tmp_datetime)
-                    # Align timeseries to observed
-                    (mod, self.obs) = tmp_mod.align(obs, join='inner')
-                    
-                    #import pdb; pdb.set_trace()
-                    
-                    # Stash date for X values (assume they are the same for all runs
-                    if self.x == None:
-                        #self.x = numpy.array(mod.index)
-                        self.x = [datetime.strptime(str(d), '%Y-%m-%d %H:%M:%S') for d in mod.index]
-                        
-                    #import pdb; pdb.set_trace()    
-                    
-                    # Put data in matrix
-                    dataLen = len(mod)
-                    if self.ysim == None:
-                        # Allocate matrix for results
-                        self.ysim = numpy.empty( (numRuns, dataLen) )
-                    assert( numpy.shape(self.ysim)[1] == dataLen )
-                    self.ysim[i,] = mod
-                    
-                    # Store fitness parameter
-                    self.likelihood[i] = run.nse
-                            
-                    tmpFile.close()                
-                    runsProcessed = True
-                    
             if runsProcessed:
                 behavioralFilename = 'behavioral'
                 if options.supressObs:
                     behavioralFilename += '_noObs'
-                if options.plotMean:
-                    behavioralFilename += '_mean'
+                if options.plotMedian:
+                    behavioralFilename += '_median'
                 if options.color:
                     behavioralFilename += '_color'
                 if options.legend:
@@ -380,7 +406,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                ylabel=r'Streamflow ($mm^{-d}$)',
                                                title=options.title, 
                                                plotObs=(not options.supressObs),
-                                               plotMean=options.plotMean,
+                                               plotMedian=options.plotMedian,
                                                plotColor=options.color,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
@@ -390,7 +416,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                ylabel=r'Streamflow ($mm^{-d}$)',
                                                title=options.title,
                                                plotObs=(not options.supressObs),
-                                               plotMean=options.plotMean,
+                                               plotMedian=options.plotMedian,
                                                plotColor=options.color,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
