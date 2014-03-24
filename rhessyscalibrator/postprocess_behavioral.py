@@ -172,6 +172,11 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                             dest="outputFormat", default="PDF", choices=["PDF", "PNG"],
                             help="Output format to save figures in.")
 
+        parser.add_argument("--behavioral_filter", action="store",
+                            dest="behavioral_filter", required=False,
+                            default="nse>0.5 and nse_log>0.5",
+                            help="SQL where clause to use to determine which runs qualify as behavioral parameters.  E.g. 'nse>0.5 AND nse_log>0.5' (use quotes)")
+
         parser.add_argument("-l", "--loglevel", action="store",
                             dest="loglevel", default="OFF",
                             help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
@@ -238,11 +243,17 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             self.logger.debug("Obs path: %s" % obsFilePath)
             
             # Get runs in session
-            runs = calibratorDB.getRunsInSession(session.id)
+            runs = calibratorDB.getRunsInSession(session.id, where_clause=options.behavioral_filter)
             numRuns = len(runs) 
             if numRuns == 0:
                 raise Exception("No runs found for session %d" 
                                 % (session.id,))
+            response = raw_input("%d runs selected for plotting from session %d, continue? [yes | no] " % \
+                                (numRuns, options.session_id ) )
+            response = response.lower()
+            if response != 'y' and response != 'yes':
+                # Exit normally
+                return 0
             self.logger.debug("%d behavioral runs" % (numRuns,) )
             
             # Read observed data from file
