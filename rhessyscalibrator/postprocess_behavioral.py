@@ -57,7 +57,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
     def saveUncertaintyBoundsPlot(self, outDir, filename, lowerBound, upperBound,
                                   format='PDF', log=False, xlabel=None, ylabel=None,
                                   title=None, plotObs=True, plotMean=False, plotColor=False,
-                                  sizeX=1, sizeY=1, dpi=80):
+                                  legend=True, sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -77,13 +77,11 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         assert( self.ysim is not None )
         
         if plotColor:
-            minYcolor = '0.5'
-            maxYcolor = '0.25'
+            fillColor = '0.5'
             obs_color = 'blue'
             mean_color = 'yellow'
         else:
-            minYcolor = '0.5'
-            maxYcolor = '0.25'
+            fillColor = '0.5'
             obs_color = 'black'
             mean_color = '0.75'
         
@@ -120,12 +118,6 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
         data_plt = []
         legend_items = []
-        (p, ) = ax.plot(self.x, minYsim, color=minYcolor, linestyle='solid')
-        data_plt.append(p)
-        legend_items.append('95th percentile - lower')
-        (p, ) = ax.plot(self.x, maxYsim, color=maxYcolor, linestyle='solid') 
-        data_plt.append(p)
-        legend_items.append('95th percentile - upper')
         # Draw observed line
         if plotObs:
             (p, ) = ax.plot(self.x, self.obs, color=obs_color, linestyle='solid')
@@ -136,7 +128,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             data_plt.append(p)
             legend_items.append('Mean')
         # Draw shaded uncertainty envelope
-        ax.fill_between(self.x, minYsim, maxYsim, color='0.9')
+        ax.fill_between(self.x, minYsim, maxYsim, color=fillColor)
         
         # Annotations
         # X-axis
@@ -158,11 +150,12 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             fig.suptitle(title, y=0.99)
             
         # Plot legend last
-        legend = ax.legend( data_plt, legend_items, 'upper left', fontsize='x-small', 
-                            ncol=len(legend_items)/2, frameon=True )
-        frame = legend.get_frame()
-        frame.set_facecolor('0.9')
-        frame.set_alpha(0.5)
+        if legend:
+            legend = ax.legend( data_plt, legend_items, 'upper left', fontsize='x-small', 
+                                ncol=len(legend_items)/2, frameon=True )
+            frame = legend.get_frame()
+            frame.set_facecolor('0.9')
+            frame.set_alpha(0.5)
             
         # Save the figure
         fig.savefig(plotFilepath, format=format, bbox_inches='tight', pad_inches=0.25)
@@ -224,6 +217,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
 
         parser.add_argument("--color", action="store_true", required=False, default=False,
                             help="Plot in color")
+        
+        parser.add_argument("--legend", action="store_true", required=False, default=False,
+                            help="Show legend")
         
         parser.add_argument('--figureX', required=False, type=int, default=4,
                             help='The width of the plot, in inches')
@@ -375,24 +371,28 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     behavioralFilename += '_mean'
                 if options.color:
                     behavioralFilename += '_color'
+                if options.legend:
+                    behavioralFilename += '_legend'
                 behavioralFilename += "_SESSION_%s" % ( options.session_id, )
                 # Generate visualizations
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=False,
-                                               ylabel=r'Streamflow (mm)',
+                                               ylabel=r'Streamflow ($mm^{-d}$)',
                                                title=options.title, 
                                                plotObs=(not options.supressObs),
                                                plotMean=options.plotMean,
                                                plotColor=options.color,
+                                               legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
                 behavioralFilename += '-log'
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=True,
-                                               ylabel=r'$Log_{10}$(Streamflow) (mm)',
+                                               ylabel=r'Streamflow ($mm^{-d}$)',
                                                title=options.title,
                                                plotObs=(not options.supressObs),
                                                plotMean=options.plotMean,
                                                plotColor=options.color,
+                                               legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
         except:
             raise
