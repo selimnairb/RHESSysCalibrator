@@ -246,8 +246,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if numRuns == 0:
             raise Exception("No runs found for session %d" 
                             % (session.id,))
-        response = raw_input("%d runs selected for plotting from session %d, continue? [yes | no] " % \
-                            (numRuns, session_id ) )
+        response = raw_input("%d runs selected for plotting from session %d in basedir '%s', continue? [yes | no] " % \
+                            (numRuns, session_id, os.path.basename(basedir) ) )
         response = response.lower()
         if response != 'y' and response != 'yes':
             # Exit normally
@@ -326,7 +326,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
         parser.add_argument("-o", "--outdir", action="store",
                             dest="outdir",
-                            help="Output directory in which to place dotty plot figures.  If not specified, basedir will be used.")
+                            help="Output directory in which to place figures.  If not specified, basedir will be used.")
 
         parser.add_argument("-f", "--file", action="store",
                             dest="observed_file",
@@ -429,3 +429,233 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             # Decrement reference count, this will (hopefully) allow __del__
             #  to be called on the once referenced object
             calibratorDB = None
+            
+class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
+    
+    def saveUncertaintyBoundsComparisonPlot(self, outDir, filename, lowerBound, upperBound,
+                                            format='PDF', log=False, xlabel=None, ylabel=None,
+                                            title=None, plotObs=True, plotMedian=False, plotColor=False,
+                                            legend_items=None, sizeX=1, sizeY=1, dpi=80):
+        """ Save uncertainty bounds plot to outDir
+        
+            @param lowerBound Float <100.0, >0.0, <upperBound
+            @param upperBound Float <100.0, >0.0, >lowerBound
+        """
+        assert( format in ['PDF', 'PNG'] )
+        if format == 'PDF':
+            plotFilename = "%s.pdf" % (filename,)
+        elif format == 'PNG':
+            plotFilename = "%s.png" % (filename,)
+        plotFilepath = os.path.join(outDir, plotFilename)
+        
+        assert( self.x1 is not None )
+        assert( self.ysim1 is not None )
+        assert( self.x2 is not None )
+        assert( self.ysim2 is not None )
+        
+        if plotColor:
+            fillColor1 = 'black'
+            fillColor2 = 'yellow'
+            obs_color = 'blue'
+            median_color1 = 'black'
+            median_color2 = 'yellow'
+        else:
+            fillColor1 = 'black'
+            fillColor2 = 'yellow'
+            median_color1 = 'black'
+            median_color2 = 'yellow'
+        
+        # Get the uncertainty boundary
+        (minYsim1, maxYsim1, medianYsim1) = calculateUncertaintyBounds(self.ysim1, self.likelihood1,
+                                                                       lowerBound, upperBound)
+        (minYsim2, maxYsim2, medianYsim2) = calculateUncertaintyBounds(self.ysim2, self.likelihood2,
+                                                                       lowerBound, upperBound)
+            
+        # Plot it up
+        fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
+        ax = fig.add_subplot(111)
+        
+        data_plt = []
+        # Draw shaded uncertainty envelope
+        ax.fill_between(self.x1, minYsim1, maxYsim1, color=fillColor1)
+        ax.fill_between(self.x2, minYsim2, maxYsim2, color=fillColor2, alpha=0.5)
+        
+        # Draw observed line
+        if plotMedian:
+            (p, ) = ax.plot(self.x1, medianYsim1, color=median_color1, linestyle='solid')
+            data_plt.append(p)
+            #legend_items.append('Median 1')
+            
+            (p, ) = ax.plot(self.x2, medianYsim2, color=median_color2, linestyle='dotted')
+            data_plt.append(p)
+            #legend_items.append('Median 2')
+        
+        # Annotations
+        # X-axis
+        quarterly = matplotlib.dates.MonthLocator(interval=3)
+        ax.xaxis.set_major_locator(quarterly)
+        ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%b-%Y') )
+        # Rotate
+        plt.setp( ax.xaxis.get_majorticklabels(), rotation=45 )
+        plt.setp( ax.xaxis.get_majorticklabels(), fontsize='xx-small' )
+        
+        if log:
+            ax.set_yscale('log')
+        
+        if xlabel:
+            ax.set_xlabel(xlabel)
+        if ylabel:
+            ax.set_ylabel(ylabel)
+        if title:
+            fig.suptitle(title, y=1.02)
+            
+        # Plot legend last
+        if legend_items:
+            legend = ax.legend( data_plt, legend_items, 'upper left', fontsize='x-small', 
+                                ncol=len(legend_items), frameon=True )
+            frame = legend.get_frame()
+            frame.set_facecolor('0.25')
+            frame.set_alpha(0.5)
+            
+        # Save the figure
+        fig.savefig(plotFilepath, format=format, bbox_inches='tight', pad_inches=0.25)
+    
+    def main(self, args):
+        # Set up command line options
+        parser = argparse.ArgumentParser(description="Tool for making comparative visualizions of output from two behavioral model runs for RHESSys")
+        parser.add_argument("basedirs", metavar="BASEDIRS", nargs=2,
+                            help="Base directories of the two calibration sessions to be compared")
+        
+        parser.add_argument("sessions", metavar="SESSIONS", type=int, nargs=2,
+                            help="Session IDs of the two behavioral runs.")
+        
+        parser.add_argument("-t", "--title",
+                            dest="title",
+                            help="Title to add to output figures")
+        
+        parser.add_argument("-o", "--outdir", required=False, default=os.getcwd(),
+                            dest="outdir",
+                            help="Output directory in which to place figures.  If not specified, the currect directory will be used.")
+
+        parser.add_argument("-of", "--outputFormat", action="store",
+                            dest="outputFormat", default="PDF", choices=["PDF", "PNG"],
+                            help="Output format to save figures in.")
+
+        parser.add_argument("--behavioral_filter", action="store",
+                            dest="behavioral_filter", required=False,
+                            default="nse>0.5 and nse_log>0.5",
+                            help="SQL where clause to use to determine which runs qualify as behavioral parameters.  E.g. 'nse>0.5 AND nse_log>0.5' (use quotes)")
+
+        parser.add_argument("--supressObs", action="store_true", required=False, default=False,
+                            help="Do not plot observered data")
+
+        parser.add_argument("--plotMedian", action="store_true", required=False, default=False,
+                            help="Plot mean value of behavioral runs")
+
+        parser.add_argument("--color", action="store_true", required=False, default=False,
+                            help="Plot in color")
+        
+        parser.add_argument("--legend", action="store", required=False, nargs=2,
+                            dest="legend_items",
+                            help="Legend items. If not supplied, no legend will be printed")
+        
+        parser.add_argument('--figureX', required=False, type=int, default=4,
+                            help='The width of the plot, in inches')
+    
+        parser.add_argument('--figureY', required=False, type=int, default=3,
+                            help='The height of the plot, in inches')
+
+        parser.add_argument("-l", "--loglevel", action="store",
+                            dest="loglevel", default="OFF",
+                            help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
+        
+        options = parser.parse_args()
+        
+        # Base of output filename
+        behavioralFilename = 'behavioral_comparison'
+        
+        # Enforce initial command line options rules
+        if "DEBUG" == options.loglevel:
+            self._initLogger(logging.DEBUG)
+        elif "CRITICAL" == options.loglevel:
+            self._initLogger(logging.CRITICAL)
+        else:
+            self._initLogger(logging.NOTSET)
+        
+        basedir1 = options.basedirs[0]
+        session1 = options.sessions[0]
+        if not os.path.isdir(basedir1) or not os.access(basedir1, os.R_OK):
+            sys.exit("Unable to access basedir %s" % (basedir1,) )
+        behavioralFilename += '_' + os.path.basename(basedir1)
+        basedir1 = os.path.abspath(basedir1)
+        
+        basedir2 = options.basedirs[1]
+        session2 = options.sessions[1]
+        if not os.path.isdir(basedir2) or not os.access(basedir2, os.R_OK):
+            sys.exit("Unable to access basedir %s" % (basedir2,) )
+        behavioralFilename += '_' + os.path.basename(basedir2)
+        basedir2 = os.path.abspath(basedir2)
+            
+        if not os.path.isdir(options.outdir) and os.access(options.outdir, os.W_OK):
+            parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
+        outdirPath = os.path.abspath(options.outdir)
+
+        try:
+            # Read data for first behavioral run
+            (runsProcessed1, self.obs1, self.x1, self.ysim1, self.likelihood1) = \
+                self.readBehavioralData(basedir1, session1, 'streamflow',
+                                        behavioral_filter=options.behavioral_filter)
+            
+            # Read data for second behavioral run
+            (runsProcessed2, self.obs2, self.x2, self.ysim2, self.likelihood2) = \
+                self.readBehavioralData(basedir2, session2, 'streamflow',
+                                        behavioral_filter=options.behavioral_filter)
+            
+            if runsProcessed1 and runsProcessed2:
+                if options.supressObs:
+                    behavioralFilename += '_noObs'
+                if options.plotMedian:
+                    behavioralFilename += '_median'
+                if options.color:
+                    behavioralFilename += '_color'
+                if options.legend_items:
+                    behavioralFilename += '_legend'
+                # Generate visualizations
+                self.saveUncertaintyBoundsComparisonPlot(outdirPath, behavioralFilename, 
+                                               2.5, 97.5, format=options.outputFormat, log=False,
+                                               ylabel=r'Streamflow ($mm^{-d}$)',
+                                               title=options.title, 
+                                               plotObs=(not options.supressObs),
+                                               plotMedian=options.plotMedian,
+                                               plotColor=options.color,
+                                               legend_items=options.legend_items,
+                                               sizeX=options.figureX, sizeY=options.figureY )
+                behavioralFilename += '-log'
+                self.saveUncertaintyBoundsComparisonPlot(outdirPath, behavioralFilename, 
+                                               2.5, 97.5, format=options.outputFormat, log=True,
+                                               ylabel=r'Streamflow ($mm^{-d}$)',
+                                               title=options.title,
+                                               plotObs=(not options.supressObs),
+                                               plotMedian=options.plotMedian,
+                                               plotColor=options.color,
+                                               legend_items=options.legend_items,
+                                               sizeX=options.figureX, sizeY=options.figureY )
+            else:
+                if not runsProcessed1:
+                    errorStr = "Did not read any behavioral data for basedir %s, session %d"
+                    self.logger.error(errorStr % \
+                                      (basedir1, session1) )
+                if not runsProcessed2:
+                    self.logger.error(errorStr % \
+                                      (basedir2, session2) )
+                return 1
+        except:
+            raise
+        else:
+            self.logger.debug("exiting normally")
+            return 0
+        finally:
+            # Decrement reference count, this will (hopefully) allow __del__
+            #  to be called on the once referenced object
+            calibratorDB = None
+    
