@@ -212,11 +212,7 @@ class RHESSysCalibrator(object):
             @return A string representing the path to the DB file relative to basedir's parent
             directory
         """
-        if not cls._dbPath:
-            cls._dbPath = os.path.join(basedir,
-                                        "db",
-                                        "calibration.db")
-        return cls._dbPath
+        return os.path.join(basedir, "db", "calibration.db")
 
     @classmethod
     def getObsPath(cls, basedir):
@@ -229,10 +225,8 @@ class RHESSysCalibrator(object):
             @return A string representing the path to the directory that stores observed data for 
             a calibration session.
         """
-        if not cls.__obsPath:
-            cls.__obsPath = os.path.join(basedir,
-                                         "obs")
-        return cls.__obsPath
+        return os.path.join(basedir, "obs")
+
 
     @classmethod
     def getRhessysPath(cls, basedir):
@@ -243,10 +237,7 @@ class RHESSysCalibrator(object):
             
             @return A string representing the path
         """
-        if not cls.__rhessysPath:
-            cls.__rhessysPath = os.path.join(basedir,
-                                             "rhessys")
-        return cls.__rhessysPath
+        return os.path.join(basedir, "rhessys")
 
     @classmethod
     def getOutputPath(cls, basedir):
@@ -258,11 +249,7 @@ class RHESSysCalibrator(object):
             
             @return A string representing the path
         """
-        if not cls.__outputPath:
-            cls.__outputPath = os.path.join(basedir, 
-                                            "rhessys", 
-                                            "output")
-        return cls.__outputPath
+        return os.path.join(basedir, "rhessys", "output")
 
     @classmethod
     def getRunOutputFilePath(cls, run_output_path):
