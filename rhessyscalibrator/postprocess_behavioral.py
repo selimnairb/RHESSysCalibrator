@@ -484,9 +484,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                         color=fillColor1)
         ax.fill_between(self.x2, minYsim2, maxYsim2, linewidth=0,
                         color=fillColor2, alpha=opacity)
-        
-        #import pdb; pdb.set_trace()
-        
+
         # Draw observed line
         if plotMedian:
             (p, ) = ax.plot(self.x1, medianYsim1, color=median_color1, linestyle='solid')
@@ -627,9 +625,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             (runsProcessed2, self.obs2, self.x2, self.ysim2, self.likelihood2) = \
                 self.readBehavioralData(basedir2, session2, 'streamflow',
                                         behavioral_filter=options.behavioral_filter)
-            
-            #import pdb; pdb.set_trace()
-            
+
             if runsProcessed1 and runsProcessed2:
                 if options.supressObs:
                     behavioralFilename += '_noObs'
