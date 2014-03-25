@@ -435,7 +435,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
     def saveUncertaintyBoundsComparisonPlot(self, outDir, filename, lowerBound, upperBound,
                                             format='PDF', log=False, xlabel=None, ylabel=None,
                                             title=None, plotObs=True, plotMedian=False, plotColor=False,
-                                            legend_items=None, sizeX=1, sizeY=1, dpi=80):
+                                            legend_items=None, sizeX=1, sizeY=1, dpi=80, opacity=0.5):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -448,6 +448,10 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             plotFilename = "%s.png" % (filename,)
         plotFilepath = os.path.join(outDir, plotFilename)
         
+        my_legend_items = None
+        if legend_items:
+            my_legend_items = []
+        
         assert( self.x1 is not None )
         assert( self.ysim1 is not None )
         assert( self.x2 is not None )
@@ -456,14 +460,13 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         if plotColor:
             fillColor1 = 'black'
             fillColor2 = 'yellow'
-            obs_color = 'blue'
             median_color1 = 'black'
             median_color2 = 'yellow'
         else:
             fillColor1 = 'black'
-            fillColor2 = 'yellow'
+            fillColor2 = '#dddddd'
             median_color1 = 'black'
-            median_color2 = 'yellow'
+            median_color2 = '#cccccc'
         
         # Get the uncertainty boundary
         (minYsim1, maxYsim1, medianYsim1) = calculateUncertaintyBounds(self.ysim1, self.likelihood1,
@@ -477,18 +480,24 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         
         data_plt = []
         # Draw shaded uncertainty envelope
-        ax.fill_between(self.x1, minYsim1, maxYsim1, color=fillColor1)
-        ax.fill_between(self.x2, minYsim2, maxYsim2, color=fillColor2, alpha=0.5)
+        ax.fill_between(self.x1, minYsim1, maxYsim1, linewidth=0,
+                        color=fillColor1)
+        ax.fill_between(self.x2, minYsim2, maxYsim2, linewidth=0,
+                        color=fillColor2, alpha=opacity)
+        
+        #import pdb; pdb.set_trace()
         
         # Draw observed line
         if plotMedian:
             (p, ) = ax.plot(self.x1, medianYsim1, color=median_color1, linestyle='solid')
             data_plt.append(p)
-            #legend_items.append('Median 1')
             
-            (p, ) = ax.plot(self.x2, medianYsim2, color=median_color2, linestyle='dotted')
+            (p, ) = ax.plot(self.x2, medianYsim2, color=median_color2, linestyle='solid')
             data_plt.append(p)
-            #legend_items.append('Median 2')
+            
+            if(legend_items):
+                my_legend_items.append("Median %s" % (legend_items[0]) )
+                my_legend_items.append("Median %s" % (legend_items[1]) )
         
         # Annotations
         # X-axis
@@ -511,8 +520,12 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             
         # Plot legend last
         if legend_items:
-            legend = ax.legend( data_plt, legend_items, 'upper left', fontsize='x-small', 
-                                ncol=len(legend_items), frameon=True )
+            if log:
+                position = 'lower left'
+            else:
+                position = 'upper left'
+            legend = ax.legend( data_plt, my_legend_items, position, fontsize='x-small', 
+                                ncol=len(my_legend_items), frameon=True )
             frame = legend.get_frame()
             frame.set_facecolor('0.25')
             frame.set_alpha(0.5)
@@ -555,7 +568,11 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         parser.add_argument("--color", action="store_true", required=False, default=False,
                             help="Plot in color")
         
-        parser.add_argument("--legend", action="store", required=False, nargs=2,
+        parser.add_argument("--opacity", action="store", required=False, 
+                            type=float, default=0.5,
+                            help="Opacity used to draw shaded uncertainty region of second calibration session.")
+        
+        parser.add_argument("-l", "--legend", action="store", required=False, nargs=2,
                             dest="legend_items",
                             help="Legend items. If not supplied, no legend will be printed")
         
@@ -565,7 +582,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         parser.add_argument('--figureY', required=False, type=int, default=3,
                             help='The height of the plot, in inches')
 
-        parser.add_argument("-l", "--loglevel", action="store",
+        parser.add_argument("--loglevel", action="store",
                             dest="loglevel", default="OFF",
                             help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
         
@@ -593,7 +610,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         session2 = options.sessions[1]
         if not os.path.isdir(basedir2) or not os.access(basedir2, os.R_OK):
             sys.exit("Unable to access basedir %s" % (basedir2,) )
-        behavioralFilename += '_' + os.path.basename(basedir2)
+        behavioralFilename += '_V_' + os.path.basename(basedir2)
         basedir2 = os.path.abspath(basedir2)
             
         if not os.path.isdir(options.outdir) and os.access(options.outdir, os.W_OK):
@@ -610,6 +627,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             (runsProcessed2, self.obs2, self.x2, self.ysim2, self.likelihood2) = \
                 self.readBehavioralData(basedir2, session2, 'streamflow',
                                         behavioral_filter=options.behavioral_filter)
+            
+            #import pdb; pdb.set_trace()
             
             if runsProcessed1 and runsProcessed2:
                 if options.supressObs:
@@ -629,7 +648,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                                plotMedian=options.plotMedian,
                                                plotColor=options.color,
                                                legend_items=options.legend_items,
-                                               sizeX=options.figureX, sizeY=options.figureY )
+                                               sizeX=options.figureX, sizeY=options.figureY,
+                                               opacity=options.opacity )
                 behavioralFilename += '-log'
                 self.saveUncertaintyBoundsComparisonPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=True,
@@ -639,7 +659,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                                plotMedian=options.plotMedian,
                                                plotColor=options.color,
                                                legend_items=options.legend_items,
-                                               sizeX=options.figureX, sizeY=options.figureY )
+                                               sizeX=options.figureX, sizeY=options.figureY,
+                                               opacity=options.opacity )
             else:
                 if not runsProcessed1:
                     errorStr = "Did not read any behavioral data for basedir %s, session %d"
