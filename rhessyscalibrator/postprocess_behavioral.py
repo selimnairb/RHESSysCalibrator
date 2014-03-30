@@ -46,10 +46,23 @@ import pandas as pd
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import matplotlib
+from matplotlib.ticker import FuncFormatter
 
 from rhessyscalibrator.postprocess import RHESSysCalibratorPostprocess
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
+
+
+def to_percent(y, position):
+    # Ignore the passed in position. This has the effect of scaling the default
+    # tick locations.
+    s = "%.0f" % ( (100 * y), )
+
+    # The percent symbol needs escaping in latex
+    if matplotlib.rcParams['text.usetex'] == True:
+        return s + r'$\%$'
+    else:
+        return s + '%'
 
 
 def calculateUncertaintyBounds(ysim, likelihood, lowerBound, upperBound):
@@ -79,6 +92,7 @@ def calculateUncertaintyBounds(ysim, likelihood, lowerBound, upperBound):
     minYsim = np.zeros(nIters)
     maxYsim = np.zeros(nIters)
     medianYsim = np.zeros(nIters)
+    meanYsim = np.zeros(nIters)
 
     # Generate uncertainty interval bounded by lower bound and upper bound
     for i in xrange(0, nIters):
@@ -94,8 +108,9 @@ def calculateUncertaintyBounds(ysim, likelihood, lowerBound, upperBound):
         minYsim[i] = validYsim[0]
         maxYsim[i] = validYsim[-1]
         medianYsim[i] = np.median(validYsim)
+        meanYsim[i] = np.mean(validYsim)
         
-    return (minYsim, maxYsim, medianYsim)
+    return (minYsim, maxYsim, medianYsim, meanYsim)
 
 
 class RHESSysCalibratorPostprocessBehavioral(object):
@@ -104,8 +119,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
     
     def saveUncertaintyBoundsPlot(self, outDir, filename, lowerBound, upperBound,
                                   format='PDF', log=False, xlabel=None, ylabel=None,
-                                  title=None, plotObs=True, plotMedian=False, plotColor=False,
-                                  legend=True, sizeX=1, sizeY=1, dpi=80):
+                                  title=None, plotObs=True, plotMedian=False, plotMean=False, 
+                                  plotColor=False, legend=True, sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -124,19 +139,22 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if plotColor:
             fillColor = '0.5'
             obs_color = 'blue'
-            mean_color = 'yellow'
+            median_color = 'magenta'
+            mean_color = 'green'
             min_color = 'grey'
             max_color = 'grey'
         else:
             fillColor = '0.5'
             obs_color = 'black'
-            mean_color = '0.75'
+            median_color = '0.75'
+            mean_color = '0.25'
             min_color = 'grey'
             max_color = 'grey'
         
         # Get the uncertainty boundary
-        (minYsim, maxYsim, medianYsim) = calculateUncertaintyBounds(self.ysim, self.likelihood,
-                                                                    lowerBound, upperBound)
+        (minYsim, maxYsim, medianYsim, meanYsim) = \
+            calculateUncertaintyBounds(self.ysim, self.likelihood,
+                                       lowerBound, upperBound)
             
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
@@ -150,9 +168,13 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             data_plt.append(p)
             legend_items.append('Observed data')
         if plotMedian:
-            (p, ) = ax.plot(self.x, medianYsim, color=mean_color, linestyle='solid')
+            (p, ) = ax.plot(self.x, medianYsim, color=median_color, linestyle='solid')
             data_plt.append(p)
-            legend_items.append('Median')
+            legend_items.append('Median simulated')
+        if plotMean:
+            (p, ) = ax.plot(self.x, meanYsim, color=mean_color, linestyle='solid')
+            data_plt.append(p)
+            legend_items.append('Mean simulated')
         # Draw shaded uncertainty envelope
         ax.fill_between(self.x, minYsim, maxYsim, color=fillColor)
         
@@ -163,7 +185,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%b-%Y') )
         # Rotate
         plt.setp( ax.xaxis.get_majorticklabels(), rotation=45 )
-        plt.setp( ax.xaxis.get_majorticklabels(), fontsize='6' )
+        plt.setp( ax.xaxis.get_majorticklabels(), fontsize=6 )
+        
+        # Y-axis
+        plt.setp( ax.get_yticklabels(), fontsize=6 )
         
         if log:
             ax.set_yscale('log')
@@ -173,7 +198,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
-            fig.suptitle(title, y=0.99)
+            fig.suptitle(title, y=1.03)
         
         # Plot exceedance plot
         ax2 = fig.add_subplot(122)
@@ -189,27 +214,44 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         obs_plt = None
         if plotObs:
             obs_ecdf = sm.distributions.ECDF(self.obs)
-            obs_y = obs_ecdf(x)
-            ax2.plot(x, obs_y, color=obs_color)
-        
+            obs_y = 1 - obs_ecdf(x)
+            ax2.plot(obs_y, x, color=obs_color)
         if plotMedian:
             med_ecdf = sm.distributions.ECDF(medianYsim)
-            med_y = med_ecdf(x)
-            ax2.plot(x, med_y, color=mean_color, lineslyle='solid')
+            med_y = 1 - med_ecdf(x)
+            ax2.plot(med_y, x, color=median_color, linestyle='solid')
+        if plotMean:
+            mean_ecdf = sm.distributions.ECDF(meanYsim)
+            mean_y = 1 - mean_ecdf(x)
+            ax2.plot(mean_y, x, color=mean_color, linestyle='solid')
         
         min_ecdf = sm.distributions.ECDF(minYsim)
-        min_y = min_ecdf(x)
-        ax2.plot(x, min_y, color=min_color, linestyle='dashed')
+        min_y = 1 - min_ecdf(x)
+        ax2.plot(min_y, x, color=min_color, linestyle='dashed')
         
         max_ecdf = sm.distributions.ECDF(maxYsim)
-        max_y = max_ecdf(x)
-        ax2.plot(x, max_y, color=max_color, linestyle='dashed')
+        max_y = 1 - max_ecdf(x)
+        ax2.plot(max_y, x, color=max_color, linestyle='dashed')
         
+        # Annotations
+        # X-axis
+        formatter = FuncFormatter(to_percent)
+        ax2.xaxis.set_major_formatter(formatter)
+        ax2.set_xlabel('Exceedance probability (%)')
+        
+        # Y-axis
+        if log:
+            ax2.set_yscale('log')
+        else:
+            ax2.set_ylim( ax.get_ylim() )
+        
+        plt.setp( ax2.get_xticklabels(), fontsize=6 )
+        plt.setp( ax2.get_yticklabels(), fontsize=6 )
         
         # Plot legend last
         if legend:
-            legend = fig.legend( data_plt, legend_items, 'lower right', fontsize='x-small', 
-                                ncol=len(legend_items)/2, frameon=True )
+            legend = fig.legend( data_plt, legend_items, 'lower center', fontsize='x-small', 
+                                ncol=len(legend_items), frameon=True )
             frame = legend.get_frame()
             frame.set_facecolor('0.9')
             frame.set_alpha(0.5)
@@ -380,6 +422,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                             help="Do not plot observered data")
 
         parser.add_argument("--plotMedian", action="store_true", required=False, default=False,
+                            help="Plot median value of behavioral runs")
+        
+        parser.add_argument("--plotMean", action="store_true", required=False, default=False,
                             help="Plot mean value of behavioral runs")
 
         parser.add_argument("--color", action="store_true", required=False, default=False,
@@ -430,6 +475,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     behavioralFilename += '_noObs'
                 if options.plotMedian:
                     behavioralFilename += '_median'
+                if options.plotMean:
+                    behavioralFilename += '_mean'
                 if options.color:
                     behavioralFilename += '_color'
                 if options.legend:
@@ -442,6 +489,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                title=options.title, 
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
+                                               plotMean=options.plotMean,
                                                plotColor=options.color,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
@@ -452,6 +500,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                title=options.title,
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
+                                               plotMean=options.plotMean,
                                                plotColor=options.color,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
@@ -504,10 +553,12 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             median_color2 = '#cccccc'
         
         # Get the uncertainty boundary
-        (minYsim1, maxYsim1, medianYsim1) = calculateUncertaintyBounds(self.ysim1, self.likelihood1,
-                                                                       lowerBound, upperBound)
-        (minYsim2, maxYsim2, medianYsim2) = calculateUncertaintyBounds(self.ysim2, self.likelihood2,
-                                                                       lowerBound, upperBound)
+        (minYsim1, maxYsim1, medianYsim1, meanYsim1) = \
+            calculateUncertaintyBounds(self.ysim1, self.likelihood1,
+                                       lowerBound, upperBound)
+        (minYsim2, maxYsim2, medianYsim2, meanYsim2) = \
+            calculateUncertaintyBounds(self.ysim2, self.likelihood2,
+                                       lowerBound, upperBound)
             
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
