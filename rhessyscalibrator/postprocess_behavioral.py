@@ -562,7 +562,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot(121)
         
         data_plt = []
         # Draw shaded uncertainty envelope
@@ -590,7 +590,10 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%b-%Y') )
         # Rotate
         plt.setp( ax.xaxis.get_majorticklabels(), rotation=45 )
-        plt.setp( ax.xaxis.get_majorticklabels(), fontsize='xx-small' )
+        plt.setp( ax.xaxis.get_majorticklabels(), fontsize=6 )
+        
+        # Y-axis
+        plt.setp( ax.get_yticklabels(), fontsize=6 )
         
         if log:
             ax.set_yscale('log')
@@ -600,15 +603,59 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         if ylabel:
             ax.set_ylabel(ylabel)
         if title:
-            fig.suptitle(title, y=1.02)
+            fig.suptitle(title, y=1.03)
+    
+        # Plot exceedance plot
+        ax2 = fig.add_subplot(122)
+        
+        num_data = max( len(self.ysim1), len(self.ysim2) )
+        min_x = min( np.min(self.ysim1), np.min(self.ysim2) )
+        max_x = max( np.max(self.ysim1), np.max(self.ysim2) )
+        x = np.linspace(min_x, max_x, num=num_data )
+        
+        if plotMedian:
+            med_ecdf1 = sm.distributions.ECDF(medianYsim1)
+            med_y1 = 1 - med_ecdf1(x)
+            ax2.plot(med_y1, x, color=median_color1, linestyle='solid')
             
+            med_ecdf2 = sm.distributions.ECDF(medianYsim2)
+            med_y2 = 1 - med_ecdf2(x)
+            ax2.plot(med_y2, x, color=median_color2, linestyle='solid')
+        
+        min_ecdf1 = sm.distributions.ECDF(minYsim1)
+        min_y1 = 1 - min_ecdf1(x)
+        ax2.plot(min_y1, x, color=fillColor1, linestyle='dashed')
+        
+        min_ecdf2 = sm.distributions.ECDF(minYsim2)
+        min_y2 = 1 - min_ecdf2(x)
+        ax2.plot(min_y2, x, color=fillColor2, linestyle='dashed')
+        
+        max_ecdf1 = sm.distributions.ECDF(maxYsim1)
+        max_y1 = 1 - max_ecdf1(x)
+        ax2.plot(max_y1, x, color=fillColor1, linestyle='dashed')
+        
+        max_ecdf2 = sm.distributions.ECDF(maxYsim2)
+        max_y2 = 1 - max_ecdf2(x)
+        ax2.plot(max_y2, x, color=fillColor2, linestyle='dashed')
+        
+        # Annotations
+        # X-axis
+        formatter = FuncFormatter(to_percent)
+        ax2.xaxis.set_major_formatter(formatter)
+        ax2.set_xlabel('Exceedance probability (%)')
+        
+        # Y-axis
+        if log:
+            ax2.set_yscale('log')
+        else:
+            ax2.set_ylim( ax.get_ylim() )
+        
+        plt.setp( ax2.get_xticklabels(), fontsize=6 )
+        plt.setp( ax2.get_yticklabels(), fontsize=6 )
+    
         # Plot legend last
         if legend_items:
-            if log:
-                position = 'lower left'
-            else:
-                position = 'upper left'
-            legend = ax.legend( data_plt, my_legend_items, position, fontsize='x-small', 
+            legend = fig.legend( data_plt, my_legend_items, 'lower center', fontsize='x-small', 
                                 ncol=len(my_legend_items), frameon=True )
             frame = legend.get_frame()
             frame.set_facecolor('0.25')
