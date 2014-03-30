@@ -41,8 +41,9 @@ import logging
 from datetime import datetime
 
 import math
-import numpy
+import numpy as np
 import pandas as pd
+import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import matplotlib
 
@@ -69,30 +70,30 @@ def calculateUncertaintyBounds(ysim, likelihood, lowerBound, upperBound):
     assert( lowerBound < upperBound )
     
     # Normalize likelihood to have values from 0 to 1
-    normLH = likelihood / numpy.sum(likelihood)
+    normLH = likelihood / np.sum(likelihood)
     
     lower = lowerBound / 100.0
     upper = upperBound / 100.0
 
-    nIters = numpy.shape(ysim)[1]
-    minYsim = numpy.zeros(nIters)
-    maxYsim = numpy.zeros(nIters)
-    medianYsim = numpy.zeros(nIters)
+    nIters = np.shape(ysim)[1]
+    minYsim = np.zeros(nIters)
+    maxYsim = np.zeros(nIters)
+    medianYsim = np.zeros(nIters)
 
     # Generate uncertainty interval bounded by lower bound and upper bound
     for i in xrange(0, nIters):
         ys = ysim[:,i]
         # Use CDF of likelihood values as basis for interval
-        sortedIdx = numpy.argsort(ys)
+        sortedIdx = np.argsort(ys)
         sortYsim = ys[sortedIdx]
         sortLH = normLH[sortedIdx]
-        cumLH = numpy.cumsum(sortLH)
+        cumLH = np.cumsum(sortLH)
         cond = (cumLH > lower) & (cumLH < upper)
             
         validYsim = sortYsim[cond]
         minYsim[i] = validYsim[0]
         maxYsim[i] = validYsim[-1]
-        medianYsim[i] = numpy.median(validYsim)
+        medianYsim[i] = np.median(validYsim)
         
     return (minYsim, maxYsim, medianYsim)
 
@@ -124,10 +125,14 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             fillColor = '0.5'
             obs_color = 'blue'
             mean_color = 'yellow'
+            min_color = 'grey'
+            max_color = 'grey'
         else:
             fillColor = '0.5'
             obs_color = 'black'
             mean_color = '0.75'
+            min_color = 'grey'
+            max_color = 'grey'
         
         # Get the uncertainty boundary
         (minYsim, maxYsim, medianYsim) = calculateUncertaintyBounds(self.ysim, self.likelihood,
@@ -135,7 +140,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
-        ax = fig.add_subplot(111)
+        ax = fig.add_subplot(121)
         
         data_plt = []
         legend_items = []
@@ -158,7 +163,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter('%b-%Y') )
         # Rotate
         plt.setp( ax.xaxis.get_majorticklabels(), rotation=45 )
-        plt.setp( ax.xaxis.get_majorticklabels(), fontsize='xx-small' )
+        plt.setp( ax.xaxis.get_majorticklabels(), fontsize='6' )
         
         if log:
             ax.set_yscale('log')
@@ -169,18 +174,48 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             ax.set_ylabel(ylabel)
         if title:
             fig.suptitle(title, y=0.99)
-            
+        
+        # Plot exceedance plot
+        ax2 = fig.add_subplot(122)
+        
+        min_x = np.min(self.ysim)
+        min_obs = np.min(self.obs)
+        min_x = min(min_x, min_obs)
+        max_x = np.max(self.ysim)
+        max_obs = np.max(self.obs)
+        max_x = max(max_x, max_obs)
+        x = np.linspace(min_x, max_x, num=len(self.obs) )
+        
+        obs_plt = None
+        if plotObs:
+            obs_ecdf = sm.distributions.ECDF(self.obs)
+            obs_y = obs_ecdf(x)
+            ax2.plot(x, obs_y, color=obs_color)
+        
+        if plotMedian:
+            med_ecdf = sm.distributions.ECDF(medianYsim)
+            med_y = med_ecdf(x)
+            ax2.plot(x, med_y, color=mean_color, lineslyle='solid')
+        
+        min_ecdf = sm.distributions.ECDF(minYsim)
+        min_y = min_ecdf(x)
+        ax2.plot(x, min_y, color=min_color, linestyle='dashed')
+        
+        max_ecdf = sm.distributions.ECDF(maxYsim)
+        max_y = max_ecdf(x)
+        ax2.plot(x, max_y, color=max_color, linestyle='dashed')
+        
+        
         # Plot legend last
         if legend:
-            legend = ax.legend( data_plt, legend_items, 'upper left', fontsize='x-small', 
+            legend = fig.legend( data_plt, legend_items, 'lower right', fontsize='x-small', 
                                 ncol=len(legend_items)/2, frameon=True )
             frame = legend.get_frame()
             frame.set_facecolor('0.9')
             frame.set_alpha(0.5)
-            
+        
         # Save the figure
         fig.savefig(plotFilepath, format=format, bbox_inches='tight', pad_inches=0.25)
-        
     
     def _initLogger(self, level):
         """ Setup logger.  Log to the console for now """
@@ -263,7 +298,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
         self.logger.debug("Observed data: %s" % obs_data)
         
-        likelihood = numpy.empty(numRuns)
+        likelihood = np.empty(numRuns)
         ysim = None
         x = None
         
@@ -296,8 +331,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 dataLen = len(mod)
                 if ysim == None:
                     # Allocate matrix for results
-                    ysim = numpy.empty( (numRuns, dataLen) )
-                assert( numpy.shape(ysim)[1] == dataLen )
+                    ysim = np.empty( (numRuns, dataLen) )
+                assert( np.shape(ysim)[1] == dataLen )
                 ysim[i,] = mod
                 
                 # Store fitness parameter
