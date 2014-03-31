@@ -48,7 +48,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.ticker import FuncFormatter
 
-from rhessyscalibrator.postprocess import RHESSysCalibratorPostprocess
+from rhessysworkflows.rhessys import RHESSysOutput
+
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
 
@@ -334,7 +335,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         # Read observed data from file
         obsFile = open(obsFilePath, 'r')
         (obs_datetime, obs_data) = \
-            RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile)
+            RHESSysOutput.readObservedDataFromFile(obsFile)
         obsFile.close()
         obs = pd.Series(obs_data, index=obs_datetime)
         
@@ -359,8 +360,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 tmpFile = open(tmpOutfile, 'r')
                 
                 (tmp_datetime, tmp_data) = \
-                        RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
-                                                                        "streamflow")
+                        RHESSysOutput.readColumnFromFile(tmpFile,
+                                                         "streamflow")
                 tmp_mod = pd.Series(tmp_data, index=tmp_datetime)
                 # Align timeseries to observed
                 (mod, obs) = tmp_mod.align(obs, join='inner')

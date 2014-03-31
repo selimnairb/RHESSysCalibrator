@@ -41,16 +41,18 @@ import os
 import errno
 from optparse import OptionParser
 import logging
-import string
-from datetime import datetime
-from datetime import timedelta
-from collections import OrderedDict
+# import string
+# from datetime import datetime
+# from datetime import timedelta
+# from collections import OrderedDict
 
 import math
 import numpy
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+
+from rhessysworkflows.rhessys import RHESSysOutput
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
@@ -59,14 +61,14 @@ from rhessyscalibrator.model_runner_db import *
 class RHESSysCalibratorPostprocess(object):
     """ Main driver class for rhessys_calibrator_postprocess tool
     """
-    TIME_STEP_HOURLY = 1
-    TIME_STEP_DAILY = 2
-    TIME_STEPS = [TIME_STEP_HOURLY, TIME_STEP_DAILY]
+#     TIME_STEP_HOURLY = 1
+#     TIME_STEP_DAILY = 2
+#     TIME_STEPS = [TIME_STEP_HOURLY, TIME_STEP_DAILY]
     
-    HOUR_HEADER = 'hour'
-    DAY_HEADER = 'day'
-    MONTH_HEADER = 'month'
-    YEAR_HEADER = 'year'
+#     HOUR_HEADER = 'hour'
+#     DAY_HEADER = 'day'
+#     MONTH_HEADER = 'month'
+#     YEAR_HEADER = 'year'
     
     PARAM_S1_IDX = 0
     PARAM_S1_NAME = 'm'
@@ -136,283 +138,6 @@ class RHESSysCalibratorPostprocess(object):
         consoleHandler.setFormatter(formatter)
         # add consoleHandler to logger
         self.logger.addHandler(consoleHandler)
-
-    @classmethod
-    def readObservedDataFromFile(cls, f, header=True, timeStep=TIME_STEP_DAILY, logger=None,
-                                 readHour=True):
-        """ Reads the data from the observed data file.  Assumes that
-            there is one data point per line.  By default a daily timestep
-            is assumed, but hourly is also supported; time step is used for
-            calculating date for each datum.
-            
-            Arguments:
-            f -- file object     The text file to read from
-            header -- boolean    Specifies whether a header is present
-                                  in the file.  If True, the first
-                                  line of the file will read and used to
-                                  determine start date of the timeseries.
-                                  Date is assumed to be in the format:
-                                  "YYYY M D H"
-            timeStep -- string   One of RHESSysCalibratorPostprocess.TIME_STEPS
-            readHour -- boolean  Control whether the hour should be read from the file header
-        
-            Returns tuple (list<datetime.datetime>, list<float>)
-            Returns tuple (empty list, list<float>) if header is false  
-            Returns tuple of empty lists if there were no data.
-        """
-        assert(timeStep in RHESSysCalibratorPostprocess.TIME_STEPS)
-        
-        date_list = []
-        obs_data = []
-        tmpDate = None
-        delta = None
-        
-        if header:
-            headerData = f.readline().split()
-            if readHour:
-                tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
-                                   int(headerData[2]), int(headerData[3]) )
-            else:
-                tmpDate = datetime(int(headerData[0]), int(headerData[1]), 
-                                   int(headerData[2]) )
-                
-            if timeStep == RHESSysCalibratorPostprocess.TIME_STEP_HOURLY:
-                delta = timedelta(hours=1)
-            else:
-                delta = timedelta(days=1)
-            if logger:
-                logger.debug("Observed timeseries begin date: %s" % (str(tmpDate),) )
-           
-        data = f.readline()
-        while data:
-            obs_data.append(float(data))
-            if header:
-                date_list.append(tmpDate)
-                tmpDate = tmpDate + delta
-            
-            data = f.readline()
-
-        return (date_list, obs_data)
-
-    @classmethod
-    def readColumnsFromFile(cls, f, column_names, sep=' ', logger=None):
-        """ Reads the specified columns from the text file.  The file
-            must have a header.  Reads dates/datetime from file by searching
-            for headers with names of 'hour', 'day', 'month', 'year'
-        
-            Arguments:
-            f -- file object  The text file to read from
-            column_names -- A list of column names to return
-            sep -- The field separator (defaults to ' ')
-
-            Returns Pandas DataFrame object indexed by date
-            
-            Raises exception if data file does not include year, month, and day fields
-        """
-        cols = column_names + [RHESSysCalibratorPostprocess.HOUR_HEADER, 
-                 RHESSysCalibratorPostprocess.DAY_HEADER, 
-                 RHESSysCalibratorPostprocess.MONTH_HEADER, 
-                 RHESSysCalibratorPostprocess.YEAR_HEADER]
-        df = pd.read_csv(f, sep=' ', usecols=cols)
-        # Build index
-        time_stamps = None
-        try:
-            time_stamps = df[RHESSysCalibratorPostprocess.YEAR_HEADER].apply(str)
-            df = df.drop(RHESSysCalibratorPostprocess.YEAR_HEADER, 1)
-        except KeyError:
-            raise Exception('Data file lacks year column')
-        try:
-            time_stamps += '/' + df[RHESSysCalibratorPostprocess.MONTH_HEADER].apply(str)
-            df = df.drop(RHESSysCalibratorPostprocess.MONTH_HEADER, 1)
-        except KeyError:
-            raise Exception('Data file lacks month column')
-        try:
-            time_stamps += '/' + df[RHESSysCalibratorPostprocess.DAY_HEADER].apply(str)
-            df = df.drop(RHESSysCalibratorPostprocess.DAY_HEADER, 1)
-        except KeyError:
-            raise Exception('Data file lacks day column')
-        try:
-            time_stamps += ' ' + df[RHESSysCalibratorPostprocess.HOUR_HEADER].apply(str) + '00:00'
-            df = df.drop(RHESSysCalibratorPostprocess.HOUR_HEADER, 1)
-        except KeyError:
-            pass
-        
-        dates = [pd.to_datetime(date) for date in time_stamps]
-        datesDf = pd.DataFrame(dates, columns=['datetime'])
-        
-        df = datesDf.join(df, how='inner')
-        df = df.set_index('datetime')
-        return df
-   
-
-    @classmethod
-    def readColumnFromFile(cls, f, column_name, sep=" ", logger=None, startHour=1):
-        """ Reads the specified column from the text file.  The file
-            must have a header.  Reads dates/datetime from file by searching
-            for headers with names of 'hour', 'day', 'month', 'year'
-        
-            Arguments:
-            f -- file object  The text file to read from
-            column_name -- The name of the column to return
-            sep -- The field separator (defaults to " ")
-            startHour -- Hour to use for daily data
-
-            Returns tuple (list<datetime.datetime>, list<float>).  
-            Returns tuple of empty lists if the column had no data, or if the column was
-            not found
-        """
-        date_list = []
-        col_data = []
-
-        # Read the header line
-        header = f.readline()
-        headers = string.split(header, sep)
-        col_idx = -1
-        hour_idx = -1
-        day_idx = -1
-        month_idx = -1
-        year_idx = -1
-        col_found = False
-        # Find column_name in headers
-        for (counter, col) in enumerate(headers):
-            if col == column_name:
-                col_idx = counter
-                col_found = True
-            elif col == RHESSysCalibratorPostprocess.HOUR_HEADER:
-                hour_idx = counter
-            elif col == RHESSysCalibratorPostprocess.DAY_HEADER:
-                day_idx = counter
-            elif col == RHESSysCalibratorPostprocess.MONTH_HEADER:
-                month_idx = counter
-            elif col == RHESSysCalibratorPostprocess.YEAR_HEADER:
-                year_idx = counter
-            
-        # We found column_name, read the data
-        if col_found:
-            data = f.readline()
-            while data:
-                hour = day = month = year = None
-                cols = string.split(data, sep)
-                # Get data
-                col_data.append(float(cols[col_idx]))
-                # Get datetime
-                if hour_idx >= 0:
-                    hour = int(cols[hour_idx])
-                if day_idx >= 0:
-                    day = int(cols[day_idx])
-                if month_idx >= 0:
-                    month = int(cols[month_idx])
-                if year_idx >= 0:
-                    year = int(cols[year_idx])
-                # Construct date object
-                tmpDate = None
-                if hour and day and month and year:
-                    tmpDate = datetime(year, month, day, hour)
-                elif day and month and year:
-                    tmpDate = datetime(year, month, day, startHour)
-                elif month and year:
-                    tmpDate = datetime(year, month, 1)
-                elif year:
-                    tmpDate = datetime(year, 12, 31)
-                date_list.append(tmpDate)
-                
-                data = f.readline()
-
-        return (date_list, col_data)
-
-    @classmethod
-    def readColumnsFromPatchDailyFile(cls, f, column_names, sep=" "):
-        """ Reads the specified columns of data from a RHESSys patch daily output 
-            file.  The file must have a header.  Reads dates/datetime from file by searching
-            for headers with names of 'hour', 'day', 'month', 'year'
-        
-            Arguments:
-            f -- file object  The text file to read from
-            column_names -- List of the names of the columns to return
-            sep -- The field separator (defaults to " ")
-
-            Returns collection.OrderedDict<datetime.datetime, dict<string, list<float>>, 
-            where the value dict for each datetime key uses column_name as its key.  
-            Returns An empty dict if data for the specified columns were not found.
-        """
-        returnDict = OrderedDict()
-
-        col_idx = {}
-        found = False
-
-        # Read the header line
-        header = f.readline().strip()
-        if ' ' == sep:
-            headers = string.split(header)
-        else:
-            headers = string.split(header, sep)
-        hour_idx = -1
-        day_idx = -1
-        month_idx = -1
-        year_idx = -1
-        # Find column_name in headers
-        for (counter, col) in enumerate(headers):
-            if col in column_names:
-                col_idx[col] = counter
-                found = True
-            elif col == RHESSysCalibratorPostprocess.HOUR_HEADER:
-                hour_idx = counter
-            elif col == RHESSysCalibratorPostprocess.DAY_HEADER:
-                day_idx = counter
-            elif col == RHESSysCalibratorPostprocess.MONTH_HEADER:
-                month_idx = counter
-            elif col == RHESSysCalibratorPostprocess.YEAR_HEADER:
-                year_idx = counter
-            
-        # We found column_name, read the data
-        if found:
-            data = f.readline().strip()
-            while data and data != '':
-                hour = day = month = year = None
-                if ' ' == sep:
-                    cols = string.split(data)
-                else:
-                    cols = string.split(data, sep)
-                if not len(cols): break;
-                # Get datetime
-                if hour_idx >= 0:
-                    hour = int(cols[hour_idx])
-                if day_idx >= 0:
-                    day = int(cols[day_idx])
-                if month_idx >= 0:
-                    month = int(cols[month_idx])
-                if year_idx >= 0:
-                    year = int(cols[year_idx])
-                # Construct date object
-                tmpDate = None
-                if hour and day and month and year:
-                    tmpDate = datetime(year, month, day, hour)
-                elif day and month and year:
-                    tmpDate = datetime(year, month, day, 1)
-                elif month and year:
-                    tmpDate = datetime(year, month, 1)
-                elif year:
-                    tmpDate = datetime(year, 12, 31)
-                    
-                try:
-                    dataForDate = returnDict[tmpDate]
-                except KeyError:
-                    dataForDate = {}
-                    returnDict[tmpDate] = dataForDate
-                 
-                # Get data
-                for key in col_idx:
-                    try:
-                        tmpData = dataForDate[key]
-                    except KeyError:
-                        tmpData = []
-                        dataForDate[key] = tmpData
-                    # TODO: intelligently handle different types    
-                    tmpData.append( float(cols[ col_idx[key] ]) )
-                
-                data = f.readline()
-
-        return (returnDict)
 
     @classmethod
     def logTransform(cls, list1, list2):
@@ -1175,7 +900,7 @@ Run "%prog --help" for detailed description of all options
         # Read observed data from file
         obsFile = open(obsFilePath, 'r')
         (obs_datetime, obs_data) = \
-            RHESSysCalibratorPostprocess.readObservedDataFromFile(obsFile, logger=self.logger)
+            RHESSysOutput.readObservedDataFromFile(obsFile, logger=self.logger)
         obsFile.close()
 
         startDate = None
@@ -1283,19 +1008,19 @@ Run "%prog --help" for detailed description of all options
                     
                     if options.add_streamflow_and_gw:
                         (model_datetime, model_data) = \
-                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile, "streamflow")
+                            RHESSysOutput.readColumnFromFile(tmpFile, "streamflow")
                         streamflow = numpy.array(model_data)
                         tmpFile.seek(0)
                         
                         (model_datetime, model_data) = \
-                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile, "gw.Qout")
+                            RHESSysOutput.readColumnFromFile(tmpFile, "gw.Qout")
                         gw_Qout = numpy.array(model_data)
                         tmpResults = streamflow + gw_Qout
                                                             
                     else:
                         (model_datetime, model_data) = \
-                            RHESSysCalibratorPostprocess.readColumnFromFile(tmpFile,
-                                                                            "streamflow")
+                            RHESSysOutput.readColumnFromFile(tmpFile,
+                                                             "streamflow")
                         tmpResults = numpy.array(model_data)
                             
                     tmpFile.close()
