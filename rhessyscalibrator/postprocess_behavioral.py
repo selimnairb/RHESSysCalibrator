@@ -809,4 +809,108 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             # Decrement reference count, this will (hopefully) allow __del__
             #  to be called on the once referenced object
             calibratorDB = None
+
+class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
+    
+    TIMESERIES_EXT = os.extsep + 'csv'
+    
+    def main(self, args):
+        # Set up command line options
+        parser = argparse.ArgumentParser(description="Output timeseries from behavioral model runs of RHESSys")
+        parser.add_argument("-b", "--basedir", action="store", 
+                            dest="basedir", required=True,
+                            help="Base directory for the calibration session")
+        
+        parser.add_argument("-s", "--behavioral_session", action="store", type=int,
+                            dest="session_id", required=True,
+                            help="Session to use for behavioral runs.")
+        
+        parser.add_argument("-o", "--outdir", action="store", required=False,
+                            dest="outdir",
+                            help="Output directory in which to place figures.  If not specified, basedir will be used.")
+
+        parser.add_argument("-f", "--file", action="store", required=False, default='behavioral_ts',
+                            dest="outfile",
+                            help="The base name of the output timeseries. Files will be created for min, max, mean, and median timesers. Filenames will end in '.csv'")
+
+        parser.add_argument("--lowerBound", required=False, type=float, default=2.5,
+                            help="Percentile of lower bound of uncertainty range")
+
+        parser.add_argument("--upperBound", required=False, type=float, default=97.5,
+                            help="Percentile of upper bound of uncertainty range")
+
+        parser.add_argument("--behavioral_filter", action="store",
+                            dest="behavioral_filter", required=False,
+                            default="nse>0.5 and nse_log>0.5",
+                            help="SQL where clause to use to determine which runs qualify as behavioral parameters.  E.g. 'nse>0.5 AND nse_log>0.5' (use quotes)")
+
+        parser.add_argument("-l", "--loglevel", action="store",
+                            dest="loglevel", default="OFF",
+                            help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
+        
+        options = parser.parse_args()
+        
+        # Enforce initial command line options rules
+        if "DEBUG" == options.loglevel:
+            self._initLogger(logging.DEBUG)
+        elif "CRITICAL" == options.loglevel:
+            self._initLogger(logging.CRITICAL)
+        else:
+            self._initLogger(logging.NOTSET)
+        
+        if not os.path.isdir(options.basedir) or not os.access(options.basedir, os.W_OK):
+            sys.exit("Unable to write to basedir %s" % (options.basedir,) )
+        basedir = os.path.abspath(options.basedir)
+        
+        if not options.outdir:
+            options.outdir = basedir
+            
+        if not os.path.isdir(options.outdir) and os.access(options.outdir, os.W_OK):
+            parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
+        outdirPath = os.path.abspath(options.outdir)
+
+        try:
+            (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
+                self.readBehavioralData(basedir, options.session_id, 'streamflow',
+                                        observed_file=None, behavioral_filter=options.behavioral_filter)
+            if runsProcessed:
+                # Get the uncertainty boundary
+                colNames = ['streamflow']
+                indexLabel = 'datetime'
+                
+                (minYsim, maxYsim, medianYsim, meanYsim) = \
+                    calculateUncertaintyBounds(self.ysim, self.likelihood,
+                                               options.lowerBound, options.upperBound)
+                
+                behavioralFilename = "%s_SESSION_%s" % ( options.outfile, options.session_id )
+                behavioralFilepath = os.path.join( outdirPath, behavioralFilename )
+                # Write out min timeseries
+                minFilepath = behavioralFilepath + '_min' + BehavioralTimeseriesOut.TIMESERIES_EXT
+                min_ts = pd.Series(minYsim, index=self.x, name=colNames)
+                min_ts.to_csv(minFilepath, header=True, index_label=indexLabel)
+                
+                # Write out max timeseries
+                maxFilepath = behavioralFilepath + '_max' + BehavioralTimeseriesOut.TIMESERIES_EXT
+                max_ts = pd.Series(maxYsim, index=self.x, name=colNames)
+                max_ts.to_csv(maxFilepath, header=True, index_label=indexLabel)
+                
+                # Write out median timeseries
+                medianFilepath = behavioralFilepath + '_median' + BehavioralTimeseriesOut.TIMESERIES_EXT
+                median_ts = pd.Series(medianYsim, index=self.x, name=colNames)
+                median_ts.to_csv(medianFilepath, header=True, index_label=indexLabel)
+                
+                # Write out mean timeseries
+                meanFilepath = behavioralFilepath + '_mean' + BehavioralTimeseriesOut.TIMESERIES_EXT
+                mean_ts = pd.Series(meanYsim, index=self.x, name=colNames)
+                mean_ts.to_csv(meanFilepath, header=True, index_label=indexLabel)
+                
+        except:
+            raise
+        else:
+            self.logger.debug("exiting normally")
+            return 0
+        finally:
+            # Decrement reference count, this will (hopefully) allow __del__
+            #  to be called on the once referenced object
+            calibratorDB = None
     
