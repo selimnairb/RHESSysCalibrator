@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='rhessyscalibrator',
-      version='1.0.24',
+      version='1.0.25',
       description='Libraries and command-line scripts for handling RHESSys model calibration.',
       long_description=readme(),
       classifiers=[
@@ -23,6 +23,7 @@ setup(name='rhessyscalibrator',
       license='BSD',
       packages=['rhessyscalibrator', 'rhessyscalibrator.tests'],
       install_requires=['numpy>=1.7',
+                        'scipy',
                         'matplotlib>=1.1',
                         'pandas',
                         'rhessysworkflows>=1.21'

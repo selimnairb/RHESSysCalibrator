@@ -43,6 +43,7 @@ from datetime import datetime
 import math
 import numpy as np
 import pandas as pd
+from scipy import stats
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 import matplotlib
@@ -517,10 +518,37 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             
 class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
     
+    def calculateKolmogorovSmirnov(self, data1, data2):
+        """ Test whether the behavioral data are from the same distribution using 
+            Kolmogorov-Smirnov statistic
+            More information: http://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.ks_2samp.html
+                              http://en.wikipedia.org/wiki/Kolmogorov-Smirnov_test
+                              http://www.soest.hawaii.edu/wessel/courses/gg313/Critical_KS.pdf
+            @param data1 Array of sample data assumed to be drawn from a continuous distribution
+            @param data2 Array of sample data assumed to be drawn from a continuous distribution
+        """
+        # Calculate critical value of K-S statistic D
+        ks_crit_table = { 0.10: 1.22, 0.05: 1.36, 0.025: 1.48, 0.01: 1.63, 0.005: 1.73, 0.001: 1.95 }
+        #import pdb; pdb.set_trace()
+        alpha = 0.05
+        c_alpha = ks_crit_table[alpha]
+        n1 = len(data1)
+        n2 = len(data2)
+        ks_crit = c_alpha * math.sqrt( float(n1 + n2) / float(n1 * n2) )
+        print("\nCritical value for Kolmogorov-Smirnov statistic (D_alpha; alpha=%.4f): %.4f" % (alpha, ks_crit) )
+        
+        # Calculate K-S statistic D
+        (ks_statistic, p_value) = stats.ks_2samp(data1, data2)
+        print("Kolmogorov-Smirnov statistic (D): %.4f" % (ks_statistic,) )
+        print("D > D_alpha? %s" % ( (ks_statistic > ks_crit), ) )
+        print("\np-value: %.4f" % (p_value,) )
+        print("p-value < alpha? %s\n" % ( (p_value < alpha), ) )
+    
     def saveUncertaintyBoundsComparisonPlot(self, outDir, filename, lowerBound, upperBound,
                                             format='PDF', log=False, xlabel=None, ylabel=None,
                                             title=None, plotObs=True, plotMedian=False, plotColor=False,
-                                            legend_items=None, sizeX=1, sizeY=1, dpi=80, opacity=0.5):
+                                            legend_items=None, sizeX=1, sizeY=1, dpi=80, opacity=0.5,
+                                            ks_stat=False):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -560,7 +588,11 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         (minYsim2, maxYsim2, medianYsim2, meanYsim2) = \
             calculateUncertaintyBounds(self.ysim2, self.likelihood2,
                                        lowerBound, upperBound)
-            
+    
+        # Are the distributions the same?
+        if ks_stat:
+            self.calculateKolmogorovSmirnov(medianYsim1, medianYsim2)
+    
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
         ax = fig.add_subplot(121)
@@ -790,7 +822,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                                plotColor=options.color,
                                                legend_items=options.legend_items,
                                                sizeX=options.figureX, sizeY=options.figureY,
-                                               opacity=options.opacity )
+                                               opacity=options.opacity, ks_stat=True )
             else:
                 if not runsProcessed1:
                     errorStr = "Did not read any behavioral data for basedir %s, session %d"
