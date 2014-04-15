@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='rhessyscalibrator',
-      version='1.0.25',
+      version='1.0.26',
       description='Libraries and command-line scripts for handling RHESSys model calibration.',
       long_description=readme(),
       classifiers=[
@@ -36,6 +36,7 @@ setup(name='rhessyscalibrator',
                'bin/rhessys_calibrator_postprocess_behavioral_timeseries.py',
                'bin/rhessys_calibrator.py',
                'bin/rhessys_calibrator_postprocess.py',
+               'bin/rhessys_calibrator_restart.py',
                'bin/rhessys_calibrator_results.py'
       ],
       zip_safe=False)

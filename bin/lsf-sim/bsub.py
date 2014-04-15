@@ -68,7 +68,7 @@ row = cursor.fetchone()
 #    row = cursor.fetchone()
 
 # A random integer
-job_number = randrange(3133,129090, 27)
+job_number = randrange(1,100000000, 1)
 
 # Insert new job into DB
 cursor.execute("""INSERT INTO jobs VALUES (?, ?, ?)""", 

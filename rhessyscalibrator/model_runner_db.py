@@ -421,6 +421,22 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
         self._conn.commit()
 
         cursor.close()
+        
+    def updateRunJobId(self, id, job_id):
+        """ Updates the job_id of the given run.  
+
+            @param id Integer representing the ID of the run to update
+            @param job_id The job ID of the run
+            
+        """
+        cursor = self._conn.cursor()
+
+        cursor.execute("""UPDATE run SET job_id=? where id=?""",
+                       (job_id, id))
+
+        self._conn.commit()
+
+        cursor.close()
 
     def updateRunFitnessResults(self, id, fitness_period, nse, nse_log, 
                                 pbias=None, rsr=None,

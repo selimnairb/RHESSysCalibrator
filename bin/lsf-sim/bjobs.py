@@ -27,7 +27,7 @@ if "-a" == sys.argv[1]:
     if len(rows) > 0:
         # Print header
         print "%s%s%s%s%s%s%s%s" % \
-            (string.ljust("JOBID", 8),
+            (string.ljust("JOBID", 10),
              string.ljust("USER", 8),
              string.ljust("STAT", 6),
              string.ljust("QUEUE", 11),
@@ -38,7 +38,7 @@ if "-a" == sys.argv[1]:
 
         for row in rows:
             print "%s%s%s%s%s%s%s%s" % \
-                (string.ljust("%d" % row["lsf_job_id"], 8),
+                (string.ljust("%d" % row["lsf_job_id"], 10),
                  string.ljust("joeuser", 8),
                  string.ljust(row["lsf_stat"], 6),
                  string.ljust("week", 11),

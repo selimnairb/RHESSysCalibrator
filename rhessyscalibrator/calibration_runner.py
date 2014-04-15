@@ -67,7 +67,7 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
     JOB_STATUS_SLEEP_SECS = 60
     JOB_SUBMIT_PENDING_THRESHOLD_SLEEP_SECS = 90
 
-    def __init__(self, basedir, session_id, queue, db_path, logger):
+    def __init__(self, basedir, session_id, queue, db_path, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
@@ -76,12 +76,15 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
             @param logger logging.Logger to use to for debug messages
+            @param restart_runs Boolean indicating that runs are to be restarted 
+            (i.e. do not insert new runs into DB)
         """
         self.basedir = basedir
         self.session_id = session_id
         self._queue = queue
         self.db_path = db_path
         self.logger = logger
+        self.restart_runs = restart_runs
 
         self.db = ModelRunnerDB(db_path)
         
@@ -104,31 +107,38 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
         self._queue.task_done()
 
     def runJobInSubprocess(self, job):
-        """ Submit a job using LSF.  Will add job to DB.
+        """ Run a job using subprocess.  Will add job to DB.
         
             @param job model_runner_db.ModelRun representing the job to run
             
             @raise Exception if bsub output is not what was expected
+            @raise Exception if run to restart is not present
         """
         self.logger.critical("Launching job %s in subprocess" % (job.job_id))
         
-        # Store job in ModelRunnerDB (insertRun) (use a mutex?)
-        insertedRunID = self.db.insertRun(job.session_id,
-                                          job.worldfile,
-                                          job.param_s1, job.param_s2,
-                                          job.param_s3, job.param_sv1,
-                                          job.param_sv2, job.param_gw1,
-                                          job.param_gw2, job.param_vgsen1,
-                                          job.param_vgsen2, job.param_vgsen3,
-                                          job.param_svalt1, job.param_svalt2,
-                                          job.cmd_raw,
-                                          job.output_path,
-                                          job.job_id,
-                                          job.fitness_period,
-                                          job.nse, job.nse_log,
-                                          job.pbias, job.rsr,
-                                          job.user1, job.user2, job.user3)
-        job.id = insertedRunID
+        if self.restart_runs:
+            # Ensure run to restart exists
+            run = self.db.getRun(job.id)
+            if run is None:
+                raise Exception("Run %d does not exist and cannot be restarted" % (job.id,) )
+        else:
+            # New run, store in ModelRunnerDB (insertRun)
+            insertedRunID = self.db.insertRun(job.session_id,
+                                              job.worldfile,
+                                              job.param_s1, job.param_s2,
+                                              job.param_s3, job.param_sv1,
+                                              job.param_sv2, job.param_gw1,
+                                              job.param_gw2, job.param_vgsen1,
+                                              job.param_vgsen2, job.param_vgsen3,
+                                              job.param_svalt1, job.param_svalt2,
+                                              job.cmd_raw,
+                                              job.output_path,
+                                              job.job_id,
+                                              job.fitness_period,
+                                              job.nse, job.nse_log,
+                                              job.pbias, job.rsr,
+                                              job.user1, job.user2, job.user3)
+            job.id = insertedRunID
         
 #        print("runJobInSubprocess: __rhessys_base: %s, cwd: %s, target cwd: %s, cmd: %s" % (self.__rhessys_base, os.getcwd(), os.path.abspath( self.basedir ), job.cmd_raw ) )
         
@@ -183,7 +193,7 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
             try:
                 # Get a job off of the queue
                 run = self._queue.get(block=True, 
-                                       timeout=self.QUEUE_GET_TIMEOUT_SECS)
+                                      timeout=self.QUEUE_GET_TIMEOUT_SECS)
                 # Run the job
                 self.runJobInSubprocess(run)
                 self.jobCompleteCallback(run.job_id, run)
@@ -218,7 +228,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
 
     def __init__(self, basedir, session_id, max_active_jobs,
                  db_path, lsf_queue, polling_delay, 
-                 bsub_cmd, bjobs_cmd, logger):
+                 bsub_cmd, bjobs_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
@@ -232,6 +242,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
             @param bsub_cmd String representing the command to use to submit jobs
             @param bjobs_cmd String representing the command to use to poll job status
             @param logger logging.Logger to use to for debug messages
+            @param restart_runs Boolean indicating that runs are to be restarted 
         """
         self.basedir = basedir
         self.session_id = session_id
@@ -240,6 +251,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
         self.lsf_queue = lsf_queue
         self.JOB_STATUS_SLEEP_SECS *= polling_delay
         self.logger = logger
+        self.restart_runs = restart_runs
 
         self.db = ModelRunnerDB(db_path)
         
@@ -296,25 +308,35 @@ class CalibrationRunnerLSF(CalibrationRunner):
                              self.__bsubRegex.pattern))
         self.numActiveJobs += 1
         job.job_id = match.group(1)
-        # Store job in ModelRunnerDB (insertRun) (use a mutex?)
-        insertedRunID = self.db.insertRun(job.session_id,
-                                          job.worldfile,
-                                          job.param_s1, job.param_s2,
-                                          job.param_s3, job.param_sv1,
-                                          job.param_sv2, job.param_gw1,
-                                          job.param_gw2, job.param_vgsen1,
-                                          job.param_vgsen2, job.param_vgsen3,
-                                          job.param_svalt1, job.param_svalt2,
-                                          job.cmd_raw,
-                                          job.output_path,
-                                          job.job_id,
-                                          job.fitness_period,
-                                          job.nse, job.nse_log,
-                                          job.pbias, job.rsr,
-                                          job.user1, job.user2, job.user3)
-        job.id = insertedRunID
-        self.logger.debug("Run %s submitted as job %s" % 
-                          (job.id, job.job_id))
+        
+        if self.restart_runs:
+            # Ensure run to restart exists
+            run = self.db.getRun(job.id)
+            if run is None:
+                raise Exception("Run %d does not exist and cannot be restarted" % (job.id,) )
+            # Update job_id
+            self.db.updateRunJobId(job.id, job.job_id)
+        else:
+            # New run, store in ModelRunnerDB (insertRun)
+            insertedRunID = self.db.insertRun(job.session_id,
+                                              job.worldfile,
+                                              job.param_s1, job.param_s2,
+                                              job.param_s3, job.param_sv1,
+                                              job.param_sv2, job.param_gw1,
+                                              job.param_gw2, job.param_vgsen1,
+                                              job.param_vgsen2, job.param_vgsen3,
+                                              job.param_svalt1, job.param_svalt2,
+                                              job.cmd_raw,
+                                              job.output_path,
+                                              job.job_id,
+                                              job.fitness_period,
+                                              job.nse, job.nse_log,
+                                              job.pbias, job.rsr,
+                                              job.user1, job.user2, job.user3)
+            job.id = insertedRunID
+            
+        self.logger.critical("Run %s submitted as job %s" % 
+                             (job.id, job.job_id))
 
     def pollJobsStatusLSF(self):
         """ Check status of jobs submitted to LSF.  Will update status
@@ -355,7 +377,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
             #                  (job_id, stat, self.session_id))
             run = self.db.getRunInSession(self.session_id, job_id)
             if None == run:
-                # The run does not exist (potentially an run not
+                # The run does not exist (potentially a run not
                 # associated with our session, ignore it)
                 continue
             
@@ -380,7 +402,8 @@ class CalibrationRunnerLSF(CalibrationRunner):
                     self.db.updateRunEndtime(run.id, datetime.utcnow(), stat)
                     numRetiredJobs += 1;
                     #  Job is DONE, call self.jobCompleteCallback
-                    self.logger.critical("Job %s (run %s) has completed (numRetired: %d), calling jobCompleteCallback" % (job_id, run.id, numRetiredJobs))
+                    self.logger.critical("Job %s (run %s) has completed (numRetired: %d), status set to %s, calling jobCompleteCallback" % \
+                                         (job_id, run.id, numRetiredJobs, stat))
                     self.jobCompleteCallback(job_id, run)
                 else:
                     self.db.updateRunStatus(run.id, stat)
@@ -401,7 +424,7 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
 
     def __init__(self, basedir, session_id, queue, max_active_jobs,
                  db_path, lsf_queue, polling_delay, 
-                 bsub_cmd, bjobs_cmd, logger):
+                 bsub_cmd, bjobs_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
@@ -415,6 +438,7 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
             @param bsub_cmd String representing the command to use to submit jobs
             @param bjobs_cmd String representing the command to use to poll job status
             @param logger logging.Logger to use to for debug messages
+            @param restart_runs Boolean indicating that runs are to be restarted 
         """
         super(CalibrationRunnerQueueLSF, self).__init__(basedir, session_id,
                                                         max_active_jobs, 
@@ -422,7 +446,8 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
                                                         lsf_queue,
                                                         polling_delay,
                                                         bsub_cmd, bjobs_cmd,
-                                                        logger)
+                                                        logger,
+                                                        restart_runs=restart_runs)
         self._queue = queue
 
     def jobCompleteCallback(self, job_id, run):

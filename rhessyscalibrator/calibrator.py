@@ -61,6 +61,7 @@ from rhessyscalibrator.calibration_runner import *
 from rhessyscalibrator.calibration_parameters import *
 
 # Constants
+DEFAULT_LSF_QUEUE = 'day'
 LSF_QUEUES = ["day", "debug", "hour", "week", "bigmem"]
 PARALLEL_MODES = ["lsf", "process"]
 
@@ -107,7 +108,8 @@ class RHESSysCalibrator(object):
     @classmethod
     def initializeCalibrationRunnerConsumers(cls, basedir, logger, 
                                              session_id, parallel_mode, num_processes, polling_delay, 
-                                             lsf_queue=None, run_cmd=None, run_status_cmd=None):
+                                             lsf_queue=None, run_cmd=None, run_status_cmd=None,
+                                             restart_runs=False):
         """ Initialize a set of one or more CalibrationRunner objects
             to be used for executing calibration runs.
         
@@ -140,13 +142,15 @@ class RHESSysCalibrator(object):
                                                      polling_delay,
                                                      run_cmd,
                                                      run_status_cmd,
-                                                     logger)
+                                                     logger,
+                                                     restart_runs)
             elif "process" == parallel_mode:
                 consumer = CalibrationRunnerSubprocess(basedir,
                                                        session_id,
                                                        runQueue,
                                                        RHESSysCalibrator.getDBPath(basedir),
-                                                       logger)
+                                                       logger,
+                                                       restart_runs)
             # Create process for consumer
             proc = multiprocessing.Process(target=consumer.run,
                                            args=())
@@ -1066,7 +1070,7 @@ with the calibration session""")
         assert( ("lsf" == options.parallel_mode) or ("process" == options.parallel_mode))
 
         if not options.lsf_queue:
-            options.lsf_queue = "day"
+            options.lsf_queue = DEFAULT_LSF_QUEUE
         elif not options.lsf_queue in LSF_QUEUES:
             parser.error("""Please specify a valid queue.  See LSF_QUEUES in %prog""")
         
@@ -1230,3 +1234,284 @@ with the calibration session""")
             # Decrement reference count, this will (hopefully) allow __del__
             #  to be called on the once referenced object
             self.calibratorDB = None
+
+class RHESSysCalibratorRestart(RHESSysCalibrator):
+    
+    def main(self, args):
+        
+        # Set up command line options
+        parser = argparse.ArgumentParser(description='Restart calibration run')
+        parser.add_argument("-b", "--basedir", 
+                            dest="basedir", required=True,
+                            help="[REQUIRED] base directory for the calibration session")
+        parser.add_argument("-s", "--session", type=int,
+                            dest="session_id", required=True,
+                            help="[REQUIRED] the ID of the session for which model fitness statistics should be calculated")
+        parser.add_argument("-l", "--loglevel",
+                            dest="loglevel", default="OFF", choices=['OFF', 'DEBUG', 'CRITICAL'],
+                            help="[OPTIONAL] set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
+        parser.add_argument("-j", "--jobs", type=int,
+                            dest="processes",
+                            help="[REQUIRED] the number of simultaneous jobs (runs) to run at any given time in the calibration session (e.g. --jobs=32).  Maximum value is %d" % MAX_PROCESSORS) 
+        parser.add_argument("--simulator_path",
+                            dest="simulator_path",
+                            help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
+        parser.add_argument("-q", "--queue",
+                            dest="lsf_queue", choices=LSF_QUEUES, default=DEFAULT_LSF_QUEUE,
+                            help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
+        parser.add_argument("--parallel_mode",
+                            dest="parallel_mode", choices=PARALLEL_MODES,
+                            help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], process")
+        parser.add_argument("--polling_delay", default=1,
+                            type=int, dest="polling_delay",
+                            help="[ADVANCED; OPTIONAL] set multiplier for how long to wait in between successive pollings of job status.  Default polling delay is 60 seconds, thus a multiplier of 5 will result in a delay of 5 minutes instead of 1 minute.")
+        parser.add_argument("--use_horizontal_m_and_K_for_vertical", action="store_true",
+                            dest="use_horizontal_m_and_K_for_vertical",
+                            help="[ADVANCED; OPTIONAL] use The same m and K parameters for horizontal (i.e. -s) as well as vertical (i.e. -sv ) directions.  Defaults to false.")
+        parser.add_argument("--bsub_exclusive_mode", action="store_true",
+                            dest="bsub_exclusive_mode",
+                            help="[ADVANCED; OPTIONAL] run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
+        parser.add_argument("--bsub_mem_limit",
+                            type=int, dest="bsub_mem_limit",
+                            default=4,
+                            help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 4GB")
+
+        args = parser.parse_args()
+        
+        if args.processes > MAX_PROCESSORS:
+            sys.exit("The maximum number of jobs is %d" % MAX_PROCESSORS)
+        
+        # Set up logger
+        if "DEBUG" == args.loglevel:
+            self._initLogger(logging.DEBUG)
+        elif "CRITICAL" == args.loglevel:
+            self._initLogger(logging.CRITICAL)
+        else:
+            self._initLogger(logging.INFO)
+        
+        if not os.path.isdir(args.basedir) or not os.access(args.basedir, os.W_OK):
+            sys.exit("Unable to write to basedir %s" % (args.basedir,) )
+        self.basedir = os.path.abspath(args.basedir)
+        
+        dbPath = RHESSysCalibrator.getDBPath(self.basedir)
+        if not os.access(dbPath, os.R_OK):
+            raise IOError(errno.EACCES, "The database at %s is not readable" %
+                          dbPath)
+        self.logger.debug("DB path: %s" % dbPath)
+        
+        # Make sure we have everything we need to run calibrations        
+        # Get list of worldfiles
+        self.worldfiles = self.getWorldfiles(self.basedir)
+        if len(self.worldfiles) < 1:
+            raise Exception("No worldfiles found")
+        self.logger.debug("worldfiles: %s" % self.worldfiles)            
+         
+        # Get tecfile name
+        (res, tecfilePath) = self.getTecfilePath(self.basedir)
+        if not res:
+            raise Exception("No tecfile found")
+        
+        # Get RHESSys executable path
+        (rhessysExecFound, rhessysExec, rhessysExecPath) = \
+            self.getRHESSysExecPath(self.basedir)
+        if not rhessysExecFound:
+            raise Exception("RHESSys executable not found")
+        
+        # Read cmd.proto
+        cmd_proto = self._readCmdProtoFromFile(self.basedir)
+        if None == cmd_proto:
+            raise Exception("cmd.proto file not found")
+        elif '' == cmd_proto:
+            raise Exception("cmd.proto is an empty file")
+
+        # Parse calibrations parameters out of cmd.proto
+        paramsProto = self.parseCmdProtoForParams(cmd_proto, args.use_horizontal_m_and_K_for_vertical)
+
+        # Pre-process cmd.proto to add rhessys exec and tecfile path
+        cmd_proto_pre = self.preProcessCmdProto(cmd_proto,
+                                                os.path.join(rhessysExecPath, rhessysExec),
+                                                tecfilePath)
+
+        # Check for explicit routing and surface flowtable in cmd_proto, get dicts of
+        # flowtables from basedir
+        (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
+
+        
+        # Check for simulator_path, setup job commands accordingly
+        if args.simulator_path:
+            run_cmd = RHESSysCalibrator.getRunCmdSim(args.simulator_path)
+            run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(args.simulator_path)
+        else:
+            run_cmd = RHESSysCalibrator.getRunCmd(args.bsub_mem_limit, args.bsub_exclusive_mode)
+            run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
+        
+        try:
+            calibratorDB = \
+                ModelRunnerDB(RHESSysCalibrator.getDBPath(
+                    self.basedir))
+        
+            # Make sure the session exists
+            self.session = calibratorDB.getSession(args.session_id)
+            if None == self.session:
+                raise Exception("Session %d was not found in the calibration database %s" % (args.session_id, dbPath))
+            if self.session.status != "submitted":
+                print( "WARNING: session status is: %s.  Can only restart runs with %s status." % (self.session.status, 'submitted') )
+            else:
+                self.logger.debug("Session status is: %s" % (self.session.status,))
+                
+            # Get runs in session
+            runs = calibratorDB.getRunsInSession(self.session.id)
+            self.numRuns = len(runs) 
+            if self.numRuns == 0:
+                raise Exception("No runs found for session %d" % (self.session.id,))  
+            
+            # All possible run IDs
+            allRunIds = range(1, self.session.iterations + 1)
+            allRunIds = set(allRunIds)
+            
+            numRunsDone = 0
+            runsDone = []
+            runsToRestart = []
+            existingRunIds = []
+            for run in runs:
+                existingRunIds.append(run.id)
+                if "DONE" == run.status:
+                    runsDone.append(run)
+                    numRunsDone += 1
+                else:
+                    # If it's not done, run it again
+                    runsToRestart.append(run)
+            existingRunIds = set(existingRunIds)
+            # List of available run IDs (will be used for new runs)
+            # We have to do it this way as new run IDs won't necessarily be
+            # contiguous
+            freeRunIds = allRunIds - existingRunIds
+            
+            print("\n%%%%%\nRuns done")
+            print([r.id for r in runsDone])
+            
+            print("\n!@!@!@!@\nRuns to restart")
+            print([r.id for r in runsToRestart])
+            
+            print("\n&*&*&*&*&*&*&*&*\nFree run IDs")
+            print(freeRunIds)
+            
+            numToRestart = len(runsToRestart)
+            print("Total runs in session: %s" % (self.session.iterations,) )
+            print("Completed runs: %s" % (numRunsDone,) )
+            print("Runs to be restarted: %s" % (numToRestart,) )
+            numNewRuns = self.session.iterations - numRunsDone - numToRestart
+            print("New runs: %s" % (numNewRuns,) )
+            
+            if len(freeRunIds) != numNewRuns:
+                sys.exit("freeRunIds (%d) does not equal numNewRuns (%d)" % (len(freeRunIds), numNewRuns) )
+            
+            #import pdb; pdb.set_trace()
+            
+            response = raw_input("Continue? [yes | no] " )
+            response = response.lower()
+            if response != 'y' and response != 'yes':
+                # Exit normally
+                return(0)
+            
+            # Dispatch restarted runs to consumer
+            print("Restarting %d runs..." % (numToRestart,) )
+            # Initialize CalibrationRunner consumers for executing jobs
+            (runQueue, consumers) = \
+                RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
+                                                                       self.session.id, args.parallel_mode, args.processes, args.polling_delay,
+                                                                       args.lsf_queue, run_cmd, run_status_cmd,
+                                                                       restart_runs=True)
+            for run in runsToRestart:
+                # Dispatch to consumer
+                runQueue.put(run)
+        
+            time.sleep(5)
+
+            # Wait for all jobs to finish
+            self.logger.critical("calling runQueue.join() ...")
+            runQueue.join()
+            for consumerProcess in consumers:
+                consumerProcess.join()
+            
+            # Dispatch new runs to consumer
+            print("Launching %d new runs..." % (numNewRuns,) )
+            # TODO: refactor as this code is duplicated from RHESSysCalibrator
+            # Initialize CalibrationRunner consumers for executing jobs
+            (runQueue, consumers) = \
+                RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
+                                                                       self.session.id, args.parallel_mode, args.processes, args.polling_delay,
+                                                                       args.lsf_queue, run_cmd, run_status_cmd)
+            
+            # For each new run (from 1 to numNewRuns+1)
+            iterations = numNewRuns + 1 # make sure we get all N
+            for itr in range(1, iterations):
+                runId = freeRunIds.pop()
+                # Generate parameter values to use for all worldfiles in 
+                #  this iteration
+                parameterValues = paramsProto.generateParameterValues()
+                itr_cmd_proto = self.addParametersToCmdProto(cmd_proto_pre,
+                                                             parameterValues)
+                # For each world file
+                for worldfile in self.worldfiles.keys():
+                    self.logger.critical("run.id %d, worldfile: %s" %
+                                         (runId, worldfile))
+                    # Create new ModelRun object for this run
+                    run = ModelRun()
+                    run.session_id = self.session.id
+                    run.worldfile = worldfile
+                    run.setCalibrationParameters(parameterValues)
+                    
+                    # Add worldfile and flowtable paths to command
+                    if self.explicitRouting:
+                        if self.surfaceFlowtable:
+                            cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
+                                itr_cmd_proto, self.worldfiles[worldfile], 
+                                self.flowtablePath[worldfile],
+                                self.surfaceFlowtablePath[worldfile])
+                        else:
+                            cmd_raw_proto = self.addWorldfileAndFlowtableToCmdProto(\
+                                itr_cmd_proto, self.worldfiles[worldfile], 
+                                self.flowtablePath[worldfile])
+                    else:
+                        cmd_raw_proto = self.addWorldfileToCmdProto(\
+                            itr_cmd_proto, self.worldfiles[worldfile])
+
+                    # Finally, create output_path and generate cmd_raw
+                    run.output_path = self.createOutputPath(self.basedir,
+                                                            self.session.id,
+                                                            worldfile,
+                                                            runId)
+                    run.cmd_raw = self.getCmdRawForRun(cmd_raw_proto,
+                                                       run.output_path)
+        
+                    if "process" == args.parallel_mode:
+                        # Set job ID if we are in process parallel mode
+                        #   (in lsf mode, we will use the LSF job number instead of runId)
+                        run.job_id = runId
+        
+                    # Dispatch to consumer
+                    runQueue.put(run)
+
+            time.sleep(5)
+
+            # Wait for all jobs to finish
+            self.logger.critical("calling runQueue.join() ...")
+            runQueue.join()
+            for consumerProcess in consumers:
+                consumerProcess.join()
+
+            # Update session endtime and status
+            calibratorDB.updateSessionEndtime(self.session.id,
+                                              datetime.utcnow(),
+                                              "complete")
+            
+        except:
+            raise
+        else:
+            self.logger.debug("exiting normally")
+            return(0)
+        finally:
+            # Decrement reference count, this will (hopefully) allow __del__
+            #  to be called on the once referenced object
+            calibratorDB = None 
