@@ -158,7 +158,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             calculateUncertaintyBounds(self.ysim, self.likelihood,
                                        lowerBound, upperBound)
             
-        # Percent observations within uncertainty bounds
+        # Calculate percent observations within uncertainty bounds
         numObs = len(self.obs)
         print("\nNumber of observations: %d" % (numObs,) )
         obsLteMax = np.where(self.obs <= maxYsim)[0]
@@ -168,6 +168,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         pctObsInBounds = ( float( numObsInBounds) / float( numObs ) ) * 100.0
         print("Observations within prediction bounds: %d (%.2f%%)\n" % \
               (numObsInBounds, pctObsInBounds) )
+        
+        # Calculate Average Relative Interval Length (ARIL) as per Dotto et al. 2012
+        ARIL = (1 / float(numObs) ) * np.sum( (maxYsim - minYsim) / self.obs )
+        print("ARIL: %.2f\n" % (ARIL,) )
         
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
