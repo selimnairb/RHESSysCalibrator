@@ -158,6 +158,17 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             calculateUncertaintyBounds(self.ysim, self.likelihood,
                                        lowerBound, upperBound)
             
+        # Percent observations within uncertainty bounds
+        numObs = len(self.obs)
+        print("\nNumber of observations: %d" % (numObs,) )
+        obsLteMax = np.where(self.obs <= maxYsim)[0]
+        obsGteMin = np.where(self.obs >= minYsim)[0]
+        obsInBounds = np.intersect1d(obsLteMax, obsGteMin)
+        numObsInBounds = len(obsInBounds)
+        pctObsInBounds = ( float( numObsInBounds) / float( numObs ) ) * 100.0
+        print("Observations within prediction bounds: %d (%.2f%%)\n" % \
+              (numObsInBounds, pctObsInBounds) )
+        
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
         ax = fig.add_subplot(121)
