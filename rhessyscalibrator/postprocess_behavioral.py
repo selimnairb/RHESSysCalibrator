@@ -502,7 +502,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 # Generate visualizations
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=False,
-                                               ylabel=r'Streamflow ($mm^{-d}$)',
+                                               ylabel=r'Streamflow ($mm\ day^{-1}$)',
                                                title=options.title, 
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
@@ -513,7 +513,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 behavioralFilename += '-log'
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=True,
-                                               ylabel=r'Streamflow ($mm^{-d}$)',
+                                               ylabel=r'Streamflow ($mm\ day^{-1}$)',
                                                title=options.title,
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
