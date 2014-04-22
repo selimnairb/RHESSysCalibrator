@@ -293,7 +293,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
         
     def readBehavioralData(self, basedir, session_id, variable='streamflow',
-                           observed_file=None, behavioral_filter=None):
+                           observed_file=None, behavioral_filter=None, end_date=None):
         
         dbPath = RHESSysCalibrator.getDBPath(basedir)
         if not os.access(dbPath, os.R_OK):
@@ -354,6 +354,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             RHESSysOutput.readObservedDataFromFile(obsFile)
         obsFile.close()
         obs = pd.Series(obs_data, index=obs_datetime)
+        if end_date:
+            obs = obs[:end_date]
         
         self.logger.debug("Observed data: %s" % obs_data)
         
@@ -426,6 +428,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                             dest="observed_file",
                             help="The name of the observed file to use for calculating model fitness statistics.  Filename will be interpreted as being relative to $BASEDIR/obs. If not supplied observation file from calibration model run will be used.")
 
+        parser.add_argument("--enddate", type=int, nargs=4,
+                            help="Date on which to end fitness calculationss, of format YYYY M D H")
+
         parser.add_argument("-of", "--outputFormat", action="store",
                             dest="outputFormat", default="PDF", choices=["PDF", "PNG"],
                             help="Output format to save figures in.")
@@ -481,10 +486,18 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
         outdirPath = os.path.abspath(options.outdir)
 
+        endDate = None
+        if options.enddate:
+            # Set end date based on command line
+            endDate = datetime(options.enddate[0],
+                               options.enddate[1],
+                               options.enddate[2],
+                               options.enddate[3])
+
         try:
             (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
                 self.readBehavioralData(basedir, options.session_id, 'streamflow',
-                                        options.observed_file, options.behavioral_filter)
+                                        options.observed_file, options.behavioral_filter, end_date=endDate)
             
             if runsProcessed:
                 behavioralFilename = 'behavioral'
