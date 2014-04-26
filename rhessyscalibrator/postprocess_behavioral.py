@@ -600,9 +600,9 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         
         if plotColor:
             fillColor1 = 'black'
-            fillColor2 = 'yellow'
+            fillColor2 = 'orange'
             median_color1 = 'black'
-            median_color2 = 'yellow'
+            median_color2 = 'orange'
         else:
             fillColor1 = 'black'
             fillColor2 = '#dddddd'
