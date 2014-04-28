@@ -55,6 +55,17 @@ from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
 
 
+def exceedance_prob(y):
+    num_y = len(y)
+    sorted = np.sort(y)
+    sorted = sorted[::-1] # Reverse order
+    rank = np.arange(1, num_y+1)
+    prob = rank.astype(float) / float(num_y)
+    prob[0] = 0
+    
+    return (prob, sorted)
+
+
 def to_percent(y, position):
     # Ignore the passed in position. This has the effect of scaling the default
     # tick locations.
@@ -220,35 +231,22 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         # Plot exceedance plot
         ax2 = fig.add_subplot(122)
         
-        min_x = np.min(self.ysim)
-        min_obs = np.min(self.obs)
-        min_x = min(min_x, min_obs)
-        max_x = np.max(self.ysim)
-        max_obs = np.max(self.obs)
-        max_x = max(max_x, max_obs)
-        x = np.linspace(min_x, max_x, num=len(self.obs) )
-        
         obs_plt = None
         if plotObs:
-            obs_ecdf = sm.distributions.ECDF(self.obs)
-            obs_y = 1 - obs_ecdf(x)
-            ax2.plot(obs_y, x, color=obs_color)
+            x, y = exceedance_prob(self.obs)
+            ax2.plot(x, y, color=obs_color)
         if plotMedian:
-            med_ecdf = sm.distributions.ECDF(medianYsim)
-            med_y = 1 - med_ecdf(x)
-            ax2.plot(med_y, x, color=median_color, linestyle='solid')
+            x, y = exceedance_prob(medianYsim)
+            ax2.plot(x, y, color=median_color, linestyle='solid')
         if plotMean:
-            mean_ecdf = sm.distributions.ECDF(meanYsim)
-            mean_y = 1 - mean_ecdf(x)
-            ax2.plot(mean_y, x, color=mean_color, linestyle='solid')
+            x, y = exceedance_prob(meanYsim)
+            ax2.plot(x, y, color=mean_color, linestyle='solid')
         
-        min_ecdf = sm.distributions.ECDF(minYsim)
-        min_y = 1 - min_ecdf(x)
-        ax2.plot(min_y, x, color=min_color, linestyle='dashed')
-        
-        max_ecdf = sm.distributions.ECDF(maxYsim)
-        max_y = 1 - max_ecdf(x)
-        ax2.plot(max_y, x, color=max_color, linestyle='dashed')
+        x, y = exceedance_prob(minYsim)
+        ax2.plot(x, y, color=min_color, linestyle='dashed')
+
+        x, y = exceedance_prob(maxYsim)
+        ax2.plot(x, y, color=max_color, linestyle='dashed')
         
         # Annotations
         # X-axis
@@ -669,35 +667,24 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         # Plot exceedance plot
         ax2 = fig.add_subplot(122)
         
-        num_data = max( len(self.ysim1), len(self.ysim2) )
-        min_x = min( np.min(self.ysim1), np.min(self.ysim2) )
-        max_x = max( np.max(self.ysim1), np.max(self.ysim2) )
-        x = np.linspace(min_x, max_x, num=num_data )
-        
         if plotMedian:
-            med_ecdf1 = sm.distributions.ECDF(medianYsim1)
-            med_y1 = 1 - med_ecdf1(x)
-            ax2.plot(med_y1, x, color=median_color1, linestyle='solid')
+            x, y = exceedance_prob(medianYsim1)
+            ax2.plot(x, y, color=median_color1, linestyle='solid')
             
-            med_ecdf2 = sm.distributions.ECDF(medianYsim2)
-            med_y2 = 1 - med_ecdf2(x)
-            ax2.plot(med_y2, x, color=median_color2, linestyle='solid')
+            x, y = exceedance_prob(medianYsim2)
+            ax2.plot(x, y, color=median_color2, linestyle='solid')
         
-        min_ecdf1 = sm.distributions.ECDF(minYsim1)
-        min_y1 = 1 - min_ecdf1(x)
-        ax2.plot(min_y1, x, color=fillColor1, linestyle='dashed')
+        x, y = exceedance_prob(minYsim1)
+        ax2.plot(x, y, color=fillColor1, linestyle='dashed')
         
-        min_ecdf2 = sm.distributions.ECDF(minYsim2)
-        min_y2 = 1 - min_ecdf2(x)
-        ax2.plot(min_y2, x, color=fillColor2, linestyle='dashed')
+        x, y = exceedance_prob(minYsim2)
+        ax2.plot(x, y, color=fillColor2, linestyle='dashed')
         
-        max_ecdf1 = sm.distributions.ECDF(maxYsim1)
-        max_y1 = 1 - max_ecdf1(x)
-        ax2.plot(max_y1, x, color=fillColor1, linestyle='dashed')
+        x, y = exceedance_prob(maxYsim1)
+        ax2.plot(x, y, color=fillColor1, linestyle='dashed')
         
-        max_ecdf2 = sm.distributions.ECDF(maxYsim2)
-        max_y2 = 1 - max_ecdf2(x)
-        ax2.plot(max_y2, x, color=fillColor2, linestyle='dashed')
+        x, y = exceedance_prob(maxYsim2)
+        ax2.plot(x, y, color=fillColor2, linestyle='dashed')
         
         # Annotations
         # X-axis
