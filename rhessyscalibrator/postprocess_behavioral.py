@@ -162,6 +162,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
     def saveUncertaintyBoundsPlot(self, outDir, filename, lowerBound, upperBound,
                                   format='PDF', log=False, xlabel=None, ylabel=None,
                                   title=None, plotObs=True, plotMedian=False, plotMean=False, 
+                                  plotWeightedMean=False,
                                   plotColor=False, legend=True, sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
@@ -183,6 +184,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             obs_color = 'blue'
             median_color = 'magenta'
             mean_color = 'green'
+            weighted_mean_color = 'orange'
             min_color = 'grey'
             max_color = 'grey'
         else:
@@ -190,6 +192,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             obs_color = 'black'
             median_color = '0.75'
             mean_color = '0.25'
+            weighted_mean_color = '0.125'
             min_color = 'grey'
             max_color = 'grey'
         
@@ -213,6 +216,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         ARIL = (1 / float(numObs) ) * np.sum( (maxYsim - minYsim) / self.obs )
         print("ARIL: %.2f\n" % (ARIL,) )
         
+        wghtMean = None
+        if plotWeightedMean:
+            wghtMean = calculateWeightedEnsembleMean(self.ysim, self.likelihood)
+        
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
         ax = fig.add_subplot(121)
@@ -232,6 +239,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             (p, ) = ax.plot(self.x, meanYsim, color=mean_color, linestyle='solid')
             data_plt.append(p)
             legend_items.append('Mean simulated')
+        if plotWeightedMean:
+            (p, ) = ax.plot(self.x, wghtMean, color=weighted_mean_color, linestyle='solid')
+            data_plt.append(p)
+            legend_items.append('Weighted ensemble mean simulated')
         # Draw shaded uncertainty envelope
         ax.fill_between(self.x, minYsim, maxYsim, color=fillColor)
         
@@ -270,6 +281,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if plotMean:
             x, y = exceedance_prob(meanYsim)
             ax2.plot(x, y, color=mean_color, linestyle='solid')
+        if plotWeightedMean:
+            x, y = exceedance_prob(wghtMean)
+            ax2.plot(x, y, color=weighted_mean_color, linestyle='solid')
         
         x, y = exceedance_prob(minYsim)
         ax2.plot(x, y, color=min_color, linestyle='dashed')
@@ -475,6 +489,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
         parser.add_argument("--plotMean", action="store_true", required=False, default=False,
                             help="Plot mean value of behavioral runs")
+        
+        parser.add_argument("--plotWeightedMean", action="store_true", required=False, default=False,
+                            help="Plot weighted ensemble mean value (Seibert and Beven 2009) of behavioral runs")
 
         parser.add_argument("--color", action="store_true", required=False, default=False,
                             help="Plot in color")
@@ -534,6 +551,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     behavioralFilename += '_median'
                 if options.plotMean:
                     behavioralFilename += '_mean'
+                if options.plotWeightedMean:
+                    behavioralFilename += '_wght_mean'
                 if options.color:
                     behavioralFilename += '_color'
                 if options.legend:
@@ -547,6 +566,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
                                                plotMean=options.plotMean,
+                                               plotWeightedMean=options.plotWeightedMean,
                                                plotColor=options.color,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
@@ -558,6 +578,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
                                                plotMean=options.plotMean,
+                                               plotWeightedMean=options.plotWeightedMean,
                                                plotColor=options.color,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
