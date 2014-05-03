@@ -126,6 +126,35 @@ def calculateUncertaintyBounds(ysim, likelihood, lowerBound, upperBound):
     return (minYsim, maxYsim, medianYsim, meanYsim)
 
 
+def calculateWeightedEnsembleMean(ysim, likelihood):
+    """ Calculate weighted ensemble mean (Seibert and Beven 2009).  For each time step,
+        weights are 0.02 for the "best" model run, 0.0 for the "worst" (based on likelihood) 
+        for each. 
+    
+        @param ysim Numpy array containing a vector of data for a number of simuations,
+          dimensions [NUM_SIMULATIONS, NUM_DATA_PER_SIMULATION]
+        @param likelihood Numpy array containing model fitness parameter for each
+          simulation, dimensions [NUM_SIMULATIONS]
+          
+        @return Numpy array representing weighted ensemble mean.
+    """
+    (nSim, nIters) = np.shape(ysim)
+    weightedEnsembleMean = np.zeros(nIters)
+    
+    max_weight = (1.0 / nSim) * 2
+    weights = np.linspace(max_weight, 0.0, num=nSim)
+    
+    for i in xrange(0, nIters):
+        ys = ysim[:,i]
+        sortedIdx = np.argsort(likelihood)
+        sortYsim = ys[sortedIdx]
+        sortLH = likelihood[sortedIdx]
+        
+        weightedEnsembleMean[i] = np.sum( weights * sortYsim )
+        
+    return weightedEnsembleMean
+        
+        
 class RHESSysCalibratorPostprocessBehavioral(object):
     """ Main driver class for rhessys_calibrator_postprocess_behavioral tool
     """
@@ -950,6 +979,12 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
                 meanFilepath = behavioralFilepath + '_mean' + BehavioralTimeseriesOut.TIMESERIES_EXT
                 mean_ts = pd.Series(meanYsim, index=self.x, name=colNames)
                 mean_ts.to_csv(meanFilepath, header=True, index_label=indexLabel)
+                
+                # Write out weighted ensemble mean timeseries (Seibert and Beven 2009)
+                wghtMeanFilepath = behavioralFilepath + '_weighted_ensmb_mean' + BehavioralTimeseriesOut.TIMESERIES_EXT
+                wghtMean = calculateWeightedEnsembleMean(self.ysim, self.likelihood)
+                mean_ts = pd.Series(wghtMean, index=self.x, name=colNames)
+                mean_ts.to_csv(wghtMeanFilepath, header=True, index_label=indexLabel)
                 
         except:
             raise
