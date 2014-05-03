@@ -196,6 +196,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             min_color = 'grey'
             max_color = 'grey'
         
+        wghtMean = None
+        if plotWeightedMean:
+            wghtMean = calculateWeightedEnsembleMean(self.ysim, self.likelihood)
+        
         # Get the uncertainty boundary
         (minYsim, maxYsim, medianYsim, meanYsim) = \
             calculateUncertaintyBounds(self.ysim, self.likelihood,
@@ -215,10 +219,6 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         # Calculate Average Relative Interval Length (ARIL) as per Dotto et al. 2012
         ARIL = (1 / float(numObs) ) * np.sum( (maxYsim - minYsim) / self.obs )
         print("ARIL: %.2f\n" % (ARIL,) )
-        
-        wghtMean = None
-        if plotWeightedMean:
-            wghtMean = calculateWeightedEnsembleMean(self.ysim, self.likelihood)
         
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
@@ -620,9 +620,11 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         print("\np-value: %.4f" % (p_value,) )
         print("p-value < alpha? %s\n" % ( (p_value < alpha), ) )
     
+    
     def saveUncertaintyBoundsComparisonPlot(self, outDir, filename, lowerBound, upperBound,
                                             format='PDF', log=False, xlabel=None, ylabel=None,
-                                            title=None, plotObs=True, plotMedian=False, plotColor=False,
+                                            title=None, plotObs=True, plotMedian=False, plotWeightedMean=False,
+                                            plotColor=False,
                                             legend_items=None, sizeX=1, sizeY=1, dpi=80, opacity=0.5,
                                             ks_stat=False):
         """ Save uncertainty bounds plot to outDir
@@ -651,11 +653,20 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             fillColor2 = 'orange'
             median_color1 = 'black'
             median_color2 = 'orange'
+            weighted_mean_color1 = 'black'
+            weighted_mean_color2 = 'orange'
         else:
             fillColor1 = 'black'
             fillColor2 = '#dddddd'
             median_color1 = 'black'
             median_color2 = '#cccccc'
+            weighted_mean_color1 = 'black'
+            weighted_mean_color2 = '#cccccc'
+        
+        wghtMean1 = wghtMean2 = None
+        if plotWeightedMean:
+            wghtMean1 = calculateWeightedEnsembleMean(self.ysim1, self.likelihood1)
+            wghtMean2 = calculateWeightedEnsembleMean(self.ysim2, self.likelihood2)
         
         # Get the uncertainty boundary
         (minYsim1, maxYsim1, medianYsim1, meanYsim1) = \
@@ -680,7 +691,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         ax.fill_between(self.x2, minYsim2, maxYsim2, linewidth=0,
                         color=fillColor2, alpha=opacity)
 
-        # Draw observed line
+        # Draw ensemble median
         if plotMedian:
             (p, ) = ax.plot(self.x1, medianYsim1, color=median_color1, linestyle='solid')
             data_plt.append(p)
@@ -691,6 +702,17 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             if(legend_items):
                 my_legend_items.append("Median %s" % (legend_items[0]) )
                 my_legend_items.append("Median %s" % (legend_items[1]) )
+        # Draw weighted ensemble mean
+        if plotWeightedMean:
+            (p, ) = ax.plot(self.x1, wghtMean1, color=weighted_mean_color1, linestyle='solid', linewidth=1.0)
+            data_plt.append(p)
+            
+            (p, ) = ax.plot(self.x2, wghtMean2, color=weighted_mean_color2, linestyle='solid', linewidth=0.5)
+            data_plt.append(p)
+            
+            if(legend_items):
+                my_legend_items.append("Weighted ensemble mean %s" % (legend_items[0]) )
+                my_legend_items.append("Weighted ensemble mean %s" % (legend_items[1]) )
         
         # Annotations
         # X-axis
@@ -723,6 +745,13 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             
             x, y = exceedance_prob(medianYsim2)
             ax2.plot(x, y, color=median_color2, linestyle='solid')
+            
+        if plotWeightedMean:
+            x, y = exceedance_prob(wghtMean1)
+            ax2.plot(x, y, color=weighted_mean_color1, linestyle='solid')
+            
+            x, y = exceedance_prob(wghtMean2)
+            ax2.plot(x, y, color=weighted_mean_color2, linestyle='solid')
         
         x, y = exceedance_prob(minYsim1)
         ax2.plot(x, y, color=fillColor1, linestyle='dashed')
@@ -791,8 +820,11 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         parser.add_argument("--supressObs", action="store_true", required=False, default=False,
                             help="Do not plot observered data")
 
-        parser.add_argument("--plotMedian", action="store_true", required=False, default=False,
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("--plotMedian", action="store_true", required=False, default=False,
                             help="Plot mean value of behavioral runs")
+        group.add_argument("--plotWeightedMean", action="store_true", required=False, default=False,
+                            help="Plot weighted ensemble mean value (Seibert and Beven 2009) of behavioral runs")
 
         parser.add_argument("--color", action="store_true", required=False, default=False,
                             help="Plot in color")
@@ -862,6 +894,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                     behavioralFilename += '_noObs'
                 if options.plotMedian:
                     behavioralFilename += '_median'
+                if options.plotWeightedMean:
+                    behavioralFilename += '_wght_mean'
                 if options.color:
                     behavioralFilename += '_color'
                 if options.legend_items:
@@ -873,6 +907,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                                title=options.title, 
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
+                                               plotWeightedMean=options.plotWeightedMean,
                                                plotColor=options.color,
                                                legend_items=options.legend_items,
                                                sizeX=options.figureX, sizeY=options.figureY,
@@ -884,6 +919,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                                title=options.title,
                                                plotObs=(not options.supressObs),
                                                plotMedian=options.plotMedian,
+                                               plotWeightedMean=options.plotWeightedMean,
                                                plotColor=options.color,
                                                legend_items=options.legend_items,
                                                sizeX=options.figureX, sizeY=options.figureY,
