@@ -808,6 +808,9 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                             dest="outdir",
                             help="Output directory in which to place figures.  If not specified, the currect directory will be used.")
 
+        parser.add_argument("--enddate", type=int, nargs=4,
+                            help="Date on which to end fitness calculationss, of format YYYY M D H")
+
         parser.add_argument("-of", "--outputFormat", action="store",
                             dest="outputFormat", default="PDF", choices=["PDF", "PNG"],
                             help="Output format to save figures in.")
@@ -878,16 +881,26 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             parser.error("Figure output directory %s must be a writable directory" % (options.outdir,) )
         outdirPath = os.path.abspath(options.outdir)
 
+        endDate = None
+        if options.enddate:
+            # Set end date based on command line
+            endDate = datetime(options.enddate[0],
+                               options.enddate[1],
+                               options.enddate[2],
+                               options.enddate[3])
+
         try:
             # Read data for first behavioral run
             (runsProcessed1, self.obs1, self.x1, self.ysim1, self.likelihood1) = \
                 self.readBehavioralData(basedir1, session1, 'streamflow',
-                                        behavioral_filter=options.behavioral_filter)
+                                        behavioral_filter=options.behavioral_filter,
+                                        end_date=endDate)
             
             # Read data for second behavioral run
             (runsProcessed2, self.obs2, self.x2, self.ysim2, self.likelihood2) = \
                 self.readBehavioralData(basedir2, session2, 'streamflow',
-                                        behavioral_filter=options.behavioral_filter)
+                                        behavioral_filter=options.behavioral_filter,
+                                        end_date=endDate)
 
             if runsProcessed1 and runsProcessed2:
                 if options.supressObs:
