@@ -192,7 +192,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             obs_color = 'black'
             median_color = '0.75'
             mean_color = '0.25'
-            weighted_mean_color = '0.125'
+            weighted_mean_color = '0.667'
             min_color = 'grey'
             max_color = 'grey'
         
