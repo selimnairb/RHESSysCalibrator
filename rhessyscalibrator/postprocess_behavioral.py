@@ -163,7 +163,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                   format='PDF', log=False, xlabel=None, ylabel=None,
                                   title=None, plotObs=True, plotMedian=False, plotMean=False, 
                                   plotWeightedMean=False,
-                                  plotColor=False, legend=True, sizeX=1, sizeY=1, dpi=80):
+                                  plotColor=False, plotExceedance=True, legend=True, sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -222,7 +222,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
-        ax = fig.add_subplot(121)
+        if plotExceedance:
+            ax = fig.add_subplot(121)
+        else:
+            ax = fig.add_subplot(111)
         
         data_plt = []
         legend_items = []
@@ -269,42 +272,43 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             fig.suptitle(title, y=1.03)
         
         # Plot exceedance plot
-        ax2 = fig.add_subplot(122)
-        
-        obs_plt = None
-        if plotObs:
-            x, y = exceedance_prob(self.obs)
-            ax2.plot(x, y, color=obs_color)
-        if plotMedian:
-            x, y = exceedance_prob(medianYsim)
-            ax2.plot(x, y, color=median_color, linestyle='solid')
-        if plotMean:
-            x, y = exceedance_prob(meanYsim)
-            ax2.plot(x, y, color=mean_color, linestyle='solid')
-        if plotWeightedMean:
-            x, y = exceedance_prob(wghtMean)
-            ax2.plot(x, y, color=weighted_mean_color, linestyle='solid')
-        
-        x, y = exceedance_prob(minYsim)
-        ax2.plot(x, y, color=min_color, linestyle='dashed')
-
-        x, y = exceedance_prob(maxYsim)
-        ax2.plot(x, y, color=max_color, linestyle='dashed')
-        
-        # Annotations
-        # X-axis
-        formatter = FuncFormatter(to_percent)
-        ax2.xaxis.set_major_formatter(formatter)
-        ax2.set_xlabel('Exceedance probability (%)')
-        
-        # Y-axis
-        if log:
-            ax2.set_yscale('log')
-        else:
-            ax2.set_ylim( ax.get_ylim() )
-        
-        plt.setp( ax2.get_xticklabels(), fontsize=6 )
-        plt.setp( ax2.get_yticklabels(), fontsize=6 )
+        if plotExceedance:
+            ax2 = fig.add_subplot(122)
+            
+            obs_plt = None
+            if plotObs:
+                x, y = exceedance_prob(self.obs)
+                ax2.plot(x, y, color=obs_color)
+            if plotMedian:
+                x, y = exceedance_prob(medianYsim)
+                ax2.plot(x, y, color=median_color, linestyle='solid')
+            if plotMean:
+                x, y = exceedance_prob(meanYsim)
+                ax2.plot(x, y, color=mean_color, linestyle='solid')
+            if plotWeightedMean:
+                x, y = exceedance_prob(wghtMean)
+                ax2.plot(x, y, color=weighted_mean_color, linestyle='solid')
+            
+            x, y = exceedance_prob(minYsim)
+            ax2.plot(x, y, color=min_color, linestyle='dashed')
+    
+            x, y = exceedance_prob(maxYsim)
+            ax2.plot(x, y, color=max_color, linestyle='dashed')
+            
+            # Annotations
+            # X-axis
+            formatter = FuncFormatter(to_percent)
+            ax2.xaxis.set_major_formatter(formatter)
+            ax2.set_xlabel('Exceedance probability (%)')
+            
+            # Y-axis
+            if log:
+                ax2.set_yscale('log')
+            else:
+                ax2.set_ylim( ax.get_ylim() )
+            
+            plt.setp( ax2.get_xticklabels(), fontsize=6 )
+            plt.setp( ax2.get_yticklabels(), fontsize=6 )
         
         # Plot legend last
         if legend:
@@ -483,6 +487,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
 
         parser.add_argument("--supressObs", action="store_true", required=False, default=False,
                             help="Do not plot observered data")
+        
+        parser.add_argument('--supressExceedance', action="store_true", required=False, default=False,
+                            help='Do not generate exceedance plot')
 
         parser.add_argument("--plotMedian", action="store_true", required=False, default=False,
                             help="Plot median value of behavioral runs")
@@ -538,6 +545,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                options.enddate[2],
                                options.enddate[3])
 
+        plotExceedance = True
+        if options.supressExceedance:
+            plotExceedance = False
+
         try:
             (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
                 self.readBehavioralData(basedir, options.session_id, 'streamflow',
@@ -547,6 +558,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 behavioralFilename = 'behavioral'
                 if options.supressObs:
                     behavioralFilename += '_noObs'
+                if options.supressExceedance:
+                    behavioralFilename += '_noExc'
                 if options.plotMedian:
                     behavioralFilename += '_median'
                 if options.plotMean:
@@ -567,7 +580,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                plotMedian=options.plotMedian,
                                                plotMean=options.plotMean,
                                                plotWeightedMean=options.plotWeightedMean,
-                                               plotColor=options.color,
+                                               plotColor=options.color, plotExceedance=plotExceedance,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
                 behavioralFilename += '-log'
@@ -579,7 +592,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                plotMedian=options.plotMedian,
                                                plotMean=options.plotMean,
                                                plotWeightedMean=options.plotWeightedMean,
-                                               plotColor=options.color,
+                                               plotColor=options.color, plotExceedance=plotExceedance,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
         except:
