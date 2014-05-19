@@ -676,10 +676,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             weighted_mean_color1 = 'black'
             weighted_mean_color2 = '#cccccc'
         
-        wghtMean1 = wghtMean2 = None
-        if plotWeightedMean:
-            wghtMean1 = calculateWeightedEnsembleMean(self.ysim1, self.likelihood1)
-            wghtMean2 = calculateWeightedEnsembleMean(self.ysim2, self.likelihood2)
+        wghtMean1 = calculateWeightedEnsembleMean(self.ysim1, self.likelihood1)
+        wghtMean2 = calculateWeightedEnsembleMean(self.ysim2, self.likelihood2)
         
         # Get the uncertainty boundary
         (minYsim1, maxYsim1, medianYsim1, meanYsim1) = \
@@ -691,7 +689,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
     
         # Are the distributions the same?
         if ks_stat:
-            self.calculateKolmogorovSmirnov(medianYsim1, medianYsim2)
+            print("Calculating Kolmogorov-Smirnov statistic for weighted ensemble mean of daily streamflow...")
+            self.calculateKolmogorovSmirnov(wghtMean1, wghtMean2)
     
         # Plot it up
         fig = plt.figure(figsize=(sizeX, sizeY), dpi=dpi, tight_layout=True)
