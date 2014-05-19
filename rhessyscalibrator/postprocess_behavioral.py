@@ -450,6 +450,115 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         return (runsProcessed, obs, x, ysim, likelihood)
     
     
+    def readBehavioralDataMulti(self, basedir, session_id, cols=['streamflow'],
+                                observed_file=None, behavioral_filter=None, end_date=None):
+        
+        dbPath = RHESSysCalibrator.getDBPath(basedir)
+        if not os.access(dbPath, os.R_OK):
+            raise IOError(errno.EACCES, "The database at %s is not readable" %
+                          dbPath)
+        self.logger.debug("DB path: %s" % dbPath)
+        
+        outputPath = RHESSysCalibrator.getOutputPath(basedir)
+        if not os.access(outputPath, os.R_OK):
+            raise IOError(errno.EACCES, "The output directory %s is  not readable" % outputPath)
+        self.logger.debug("Output path: %s" % outputPath)
+
+        rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
+        
+        calibratorDB = \
+            ModelRunnerDB(RHESSysCalibrator.getDBPath(
+                basedir))
+        
+        # Make sure the session exists
+        session = calibratorDB.getSession(session_id)
+        if None == session:
+            raise Exception("Session %d was not found in the calibration database %s" % (session_id, dbPath))
+        if session.status != "complete":
+            print "WARNING: session status is: %s.  Some model runs may not have completed." % (session.status,)
+        else:
+            self.logger.debug("Session status is: %s" % (session.status,))
+        
+        # Determine observation file path
+        if observed_file:
+            obs_file = observed_file
+        else:
+            # Get observered file from session
+            assert( session.obs_filename != None )
+            obs_file = session.obs_filename
+        obsPath = RHESSysCalibrator.getObsPath(basedir)
+        obsFilePath = os.path.join(obsPath, obs_file)
+        if not os.access(obsFilePath, os.R_OK):
+            raise IOError(errno.EACCES, "The observed data file %s is  not readable" % obsFilePath)
+        self.logger.debug("Obs path: %s" % obsFilePath)
+        
+        # Get runs in session
+        runs = calibratorDB.getRunsInSession(session.id, where_clause=behavioral_filter)
+        numRuns = len(runs) 
+        if numRuns == 0:
+            raise Exception("No runs found for session %d" 
+                            % (session.id,))
+        response = raw_input("%d runs selected for plotting from session %d in basedir '%s', continue? [yes | no] " % \
+                            (numRuns, session_id, os.path.basename(basedir) ) )
+        response = response.lower()
+        if response != 'y' and response != 'yes':
+            # Exit normally
+            return 0
+        self.logger.debug("%d behavioral runs" % (numRuns,) )
+        
+        # Read observed data from file
+        obsFile = open(obsFilePath, 'r')
+        (obs_datetime, obs_data) = \
+            RHESSysOutput.readObservedDataFromFile(obsFile)
+        obsFile.close()
+        obs = pd.Series(obs_data, index=obs_datetime)
+        if end_date:
+            obs = obs[:end_date]
+        
+        self.logger.debug("Observed data: %s" % obs_data)
+        
+        numCols = len(cols)
+        likelihood = np.empty(numRuns)
+        sim = None
+        x = None
+        
+        runsProcessed = False
+        obs_day = obs.resample('D', how='sum') # Get rid of useless hour from index
+        for (i, run) in enumerate(runs):
+            if "DONE" == run.status:
+                runOutput = os.path.join(rhessysPath, run.output_path)
+                self.logger.debug(">>>\nOutput dir of run %d is %s" %
+                                     (run.id, runOutput))
+                tmpOutfile = \
+                    RHESSysCalibrator.getRunOutputFilePath(runOutput)
+                if not os.access(tmpOutfile, os.R_OK):
+                    print "Output file %s for run %d not found or not readable, unable to calculate fitness statistics for this run" % (tmpOutfile, run.id)
+                    continue
+                
+                tmpFile = open(tmpOutfile, 'r')
+                tmp_data = RHESSysOutput.readColumnsFromFile(tmpFile, cols)
+                # Align timeseries to observed
+                (mod_align, obs_align) = tmp_data.align(obs_day, axis=0, join='inner')
+                                 
+                # Stash date for X values (assume they are the same for all runs
+                if x == None:
+                    x = [datetime.strptime(str(d), '%Y-%m-%d %H:%M:%S') for d in mod_align.index]
+                # Put data in matrix
+                dataLen = len(mod_align)
+                if sim == None:
+                    # Allocate list for results
+                    sim = []
+                sim.append(mod_align)
+                
+                # Store fitness parameter
+                likelihood[i] = run.nse
+                        
+                tmpFile.close()                
+                runsProcessed = True
+        
+        return (runsProcessed, obs_align, x, sim, likelihood)
+    
+    
     def main(self, args):
         # Set up command line options
         parser = argparse.ArgumentParser(description="Tool for visualizing output from behavioral model runs for RHESSys")
@@ -858,6 +967,9 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         parser.add_argument('--figureY', required=False, type=int, default=3,
                             help='The height of the plot, in inches')
 
+        parser.add_argument('--computeMassbalance', required=False, action='store_true', default=False,
+                            help='Deteremine whether to compute mass balance statistics (e.g. Horton index)')
+
         parser.add_argument("--loglevel", action="store",
                             dest="loglevel", default="OFF",
                             help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
@@ -949,6 +1061,38 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                                legend_items=options.legend_items,
                                                sizeX=options.figureX, sizeY=options.figureY,
                                                opacity=options.opacity, ks_stat=True )
+                
+                if options.computeMassbalance:
+                    print("\nCalculating massbalance statistics...\n")
+                    # Should refactor this as we are reading behavioral data twice
+                    # Read data for first behavioral run
+                    (runsProcessed1, obs1, x1, sim1, likelihood1) = \
+                        self.readBehavioralDataMulti(basedir1, session1, ['streamflow', 'evap', 'trans', 'baseflow'],
+                                                     behavioral_filter=options.behavioral_filter,
+                                                     end_date=endDate)
+                    hi1_avg = 0
+                    for sim in sim1:
+                        et = sim.evap + sim.trans
+                        total_et = et.sum()
+                        total_baseflow = sim.baseflow.sum()
+                        hi1_avg += total_et / (total_et + total_baseflow)
+                    hi1_avg /= len(sim1)
+                    print("\nAverage Horton index: %f\n\n" % (hi1_avg,) )
+                    
+                    # Read data for second behavioral run
+                    (runsProcessed2, obs2, x2, sim2, likelihood2) = \
+                        self.readBehavioralDataMulti(basedir2, session2, ['streamflow', 'evap', 'trans', 'baseflow'],
+                                                     behavioral_filter=options.behavioral_filter,
+                                                     end_date=endDate)
+                    hi2_avg = 0
+                    for sim in sim2:
+                        et = sim.evap + sim.trans
+                        total_et = et.sum()
+                        total_baseflow = sim.baseflow.sum()
+                        hi2_avg += total_et / (total_et + total_baseflow)
+                    hi2_avg /= len(sim2)
+                    print("\nAverage Horton index: %f\n\n" % (hi2_avg,) )
+                
             else:
                 if not runsProcessed1:
                     errorStr = "Did not read any behavioral data for basedir %s, session %d"
