@@ -1070,28 +1070,46 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                         self.readBehavioralDataMulti(basedir1, session1, ['streamflow', 'evap', 'trans', 'baseflow'],
                                                      behavioral_filter=options.behavioral_filter,
                                                      end_date=endDate)
+                    sim_et1 = []    
                     hi1_avg = 0
                     for sim in sim1:
                         et = sim.evap + sim.trans
+                        sim_et1.append(et)
                         total_et = et.sum()
                         total_baseflow = sim.baseflow.sum()
                         hi1_avg += total_et / (total_et + total_baseflow)
+                    
+                    wghtMeanET1 = calculateWeightedEnsembleMean(np.array(sim_et1), self.likelihood1)
+                    yearlyWghtMeanET1 = wghtMeanET1.sum() / (len(wghtMeanET1) / 365)
+                        
                     hi1_avg /= len(sim1)
-                    print("\nAverage Horton index: %f\n\n" % (hi1_avg,) )
+                    
+                    print("\nTotal weighted ensemble mean ET: %f" % (wghtMeanET1.sum(),) )
+                    print("Yearly weighted ensemble mean ET: %f" % (yearlyWghtMeanET1,) )
+                    print("Average Horton index: %f\n\n" % (hi1_avg,) )
                     
                     # Read data for second behavioral run
                     (runsProcessed2, obs2, x2, sim2, likelihood2) = \
                         self.readBehavioralDataMulti(basedir2, session2, ['streamflow', 'evap', 'trans', 'baseflow'],
                                                      behavioral_filter=options.behavioral_filter,
                                                      end_date=endDate)
+                    sim_et2= []
                     hi2_avg = 0
                     for sim in sim2:
                         et = sim.evap + sim.trans
+                        sim_et2.append(et)
                         total_et = et.sum()
                         total_baseflow = sim.baseflow.sum()
                         hi2_avg += total_et / (total_et + total_baseflow)
+                        
+                    wghtMeanET2 = calculateWeightedEnsembleMean(np.array(sim_et2), self.likelihood2)
+                    yearlyWghtMeanET2 = wghtMeanET2.sum() / (len(wghtMeanET2) / 365)
+                        
                     hi2_avg /= len(sim2)
-                    print("\nAverage Horton index: %f\n\n" % (hi2_avg,) )
+                    
+                    print("\nTotal weighted ensemble mean ET: %f" % (wghtMeanET2.sum(),) )
+                    print("Yearly weighted ensemble mean ET: %f" % (yearlyWghtMeanET2,) )
+                    print("Average Horton index: %f\n\n" % (hi2_avg,) )
                 
             else:
                 if not runsProcessed1:
