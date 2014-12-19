@@ -405,6 +405,8 @@ class RHESSysCalibrator(object):
         """
         self.explicitRouting = False
         self.surfaceFlowtable = False
+        flowtablePath = None
+        surfaceFlowtablePath = None
         if string.count(cmd_proto, " -r $flowtable ") > 0:
             self.explicitRouting = True
             if string.count(cmd_proto, " -r $flowtable $surface_flowtable ") > 0:
