@@ -163,7 +163,8 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                   format='PDF', log=False, xlabel=None, ylabel=None,
                                   title=None, plotObs=True, plotMedian=False, plotMean=False, 
                                   plotWeightedMean=False,
-                                  plotColor=False, plotExceedance=True, legend=True, sizeX=1, sizeY=1, dpi=80):
+                                  plotColor=False, plotExceedance=True, 
+                                  obsStyle='solid', legend=True, sizeX=1, sizeY=1, dpi=80):
         """ Save uncertainty bounds plot to outDir
         
             @param lowerBound Float <100.0, >0.0, <upperBound
@@ -231,7 +232,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         legend_items = []
         # Draw observed line
         if plotObs:
-            (p, ) = ax.plot(self.x, self.obs, color=obs_color, linestyle='solid')
+            (p, ) = ax.plot(self.x, self.obs, color=obs_color, linestyle=obsStyle)
             data_plt.append(p)
             legend_items.append('Observed data')
         if plotMedian:
@@ -609,6 +610,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         parser.add_argument("--plotWeightedMean", action="store_true", required=False, default=False,
                             help="Plot weighted ensemble mean value (Seibert and Beven 2009) of behavioral runs")
 
+        parser.add_argument("--obsStyle", required=False, default='solid', choices=['solid', 'dashed', 'dotted'],
+                            help="Line style to use for plotting observed timeseries")
+
         parser.add_argument("--color", action="store_true", required=False, default=False,
                             help="Plot in color")
         
@@ -690,6 +694,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                plotMean=options.plotMean,
                                                plotWeightedMean=options.plotWeightedMean,
                                                plotColor=options.color, plotExceedance=plotExceedance,
+                                               obsStyle=options.obsStyle,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
                 behavioralFilename += '-log'
@@ -702,6 +707,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                                                plotMean=options.plotMean,
                                                plotWeightedMean=options.plotWeightedMean,
                                                plotColor=options.color, plotExceedance=plotExceedance,
+                                               obsStyle=options.obsStyle,
                                                legend=options.legend,
                                                sizeX=options.figureX, sizeY=options.figureY )
         except:
