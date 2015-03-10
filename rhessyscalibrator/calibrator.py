@@ -1428,7 +1428,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             # We have to do it this way as new run IDs won't necessarily be
             # contiguous
             # All possible run IDs
-            allRunIds = range(minDoneRunId, self.session.iterations + 1)
+            allRunIds = range(minDoneRunId, minDoneRunId + self.session.iterations)
             allRunIds = set(allRunIds)
             print("All run IDs:")
             print(allRunIds)
@@ -1450,8 +1450,8 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             numNewRuns = self.session.iterations - numRunsDone - numToRestart
             print("New runs: %s" % (numNewRuns,) )
             
-            if len(freeRunIds) < numNewRuns:
-                sys.exit("There are fewer free Run IDs (%d) than needed number of new runs (%d)" % (len(freeRunIds), numNewRuns) )
+            if len(freeRunIds) != numNewRuns:
+                sys.exit("The number of free Run IDs (%d) does not equal the needed number of new runs (%d)" % (len(freeRunIds), numNewRuns) )
             
             #import pdb; pdb.set_trace()
             
