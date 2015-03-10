@@ -161,21 +161,21 @@ class RHESSysCalibrator(object):
         return (runQueue, consumers)
     
     @classmethod
-    def getRunCmd(cls, bsub_mem_limit, bsub_exclusive_mode=False):
+    def getRunCmd(cls, mem_limit, bsub_exclusive_mode=False):
         """ Get LSF job submission command given selected options
             
-            @param bsub_mem_limit Integer >=1
+            @param mem_limit Integer >=1
             @param bsub_exclusive_mode Boolean
             
             @return String representing job submission command
         """
-        assert(bsub_mem_limit >= 1)
+        assert(mem_limit >= 1)
         
         if bsub_exclusive_mode:
             run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
         else:
             run_cmd = "bsub -n 1,1"
-        run_cmd += " -M " + str(bsub_mem_limit)
+        run_cmd += " -M " + str(mem_limit)
         return run_cmd
     
     @classmethod
@@ -1010,8 +1010,8 @@ obs/                       Where you will store observed data to be compared to
                           dest="bsub_exclusive_mode",
                           help="[ADVANCED; OPTIONAL] run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
 
-        parser.add_option("--bsub_mem_limit", action="store",
-                          type="int", dest="bsub_mem_limit",
+        parser.add_option("--mem_limit", action="store",
+                          type="int", dest="mem_limit",
                           default=4,
                           help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 4GB")
 
@@ -1099,7 +1099,7 @@ with the calibration session""")
             run_cmd = RHESSysCalibrator.getRunCmdSim(options.simulator_path)
             run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(options.simulator_path)
         else:
-            run_cmd = RHESSysCalibrator.getRunCmd(options.bsub_mem_limit, options.bsub_exclusive_mode)
+            run_cmd = RHESSysCalibrator.getRunCmd(options.mem_limit, options.bsub_exclusive_mode)
             run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
 
         # Main events take place herein ...
@@ -1273,8 +1273,8 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         parser.add_argument("--bsub_exclusive_mode", action="store_true",
                             dest="bsub_exclusive_mode",
                             help="[ADVANCED; OPTIONAL] run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
-        parser.add_argument("--bsub_mem_limit",
-                            type=int, dest="bsub_mem_limit",
+        parser.add_argument("--mem_limit",
+                            type=int, dest="mem_limit",
                             default=4,
                             help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 4GB")
 
@@ -1344,7 +1344,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             run_cmd = RHESSysCalibrator.getRunCmdSim(args.simulator_path)
             run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(args.simulator_path)
         else:
-            run_cmd = RHESSysCalibrator.getRunCmd(args.bsub_mem_limit, args.bsub_exclusive_mode)
+            run_cmd = RHESSysCalibrator.getRunCmd(args.mem_limit, args.bsub_exclusive_mode)
             run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
         
         try:
