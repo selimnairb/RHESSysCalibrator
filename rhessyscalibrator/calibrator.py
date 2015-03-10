@@ -1375,7 +1375,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
 
         
-        run_cmd = run_stats_cmd = None
+        run_cmd = run_status_cmd = None
         if args.parallel_mode == PARALLEL_MODE_LSF:
             # Check for simulator_path, setup job commands accordingly
             if args.simulator_path:
@@ -1434,13 +1434,13 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             print(allRunIds)
             freeRunIds = allRunIds - existingRunIds
             
-            print("\n%%%%%\nRuns done")
+            print("\nRuns done")
             print([r.id for r in runsDone])
             
-            print("\n!@!@!@!@\nRuns to restart")
+            print("\nRuns to restart")
             print([r.id for r in runsToRestart])
             
-            print("\n&*&*&*&*&*&*&*&*\nFree run IDs")
+            print("\nFree run IDs")
             print(freeRunIds)
             
             numToRestart = len(runsToRestart)
