@@ -217,6 +217,8 @@ class RHESSysCalibrator(object):
             status_cmd = "bjobs"
         elif parallel_mode == PARALLEL_MODE_PBS:
             status_cmd = "qstat"
+            
+        return status_cmd
     
     @classmethod
     def getRunCmdLSFSim(cls, simulator_path):
