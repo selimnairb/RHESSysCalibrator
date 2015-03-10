@@ -1408,17 +1408,16 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             if self.numRuns == 0:
                 raise Exception("No runs found for session %d" % (self.session.id,))  
             
-            # All possible run IDs
-            allRunIds = range(1, self.session.iterations + 1)
-            allRunIds = set(allRunIds)
-            
             numRunsDone = 0
+            minDoneRunId = sys.maxint
             runsDone = []
             runsToRestart = []
             existingRunIds = []
             for run in runs:
                 existingRunIds.append(run.id)
                 if "DONE" == run.status:
+                    if run.id < minDoneRunId:
+                        minDoneRunId = run.id
                     runsDone.append(run)
                     numRunsDone += 1
                 else:
@@ -1428,6 +1427,11 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             # List of available run IDs (will be used for new runs)
             # We have to do it this way as new run IDs won't necessarily be
             # contiguous
+            # All possible run IDs
+            allRunIds = range(minDoneRunId, self.session.iterations + 1)
+            allRunIds = set(allRunIds)
+            print("All run IDs:")
+            print(allRunIds)
             freeRunIds = allRunIds - existingRunIds
             
             print("\n%%%%%\nRuns done")
@@ -1446,8 +1450,8 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             numNewRuns = self.session.iterations - numRunsDone - numToRestart
             print("New runs: %s" % (numNewRuns,) )
             
-            if len(freeRunIds) != numNewRuns:
-                sys.exit("freeRunIds (%d) does not equal numNewRuns (%d)" % (len(freeRunIds), numNewRuns) )
+            if len(freeRunIds) < numNewRuns:
+                sys.exit("There are fewer free Run IDs (%d) than needed number of new runs (%d)" % (len(freeRunIds), numNewRuns) )
             
             #import pdb; pdb.set_trace()
             
