@@ -95,8 +95,8 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                             help="Set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
 
         parser.add_argument("-q", "--queue", action="store",
-                          dest="lsf_queue", required=False,
-                          default='day', choices=calibrator.LSF_QUEUES,
+                          dest="queue_name", required=False,
+                          default=calibrator.DEFAULT_QUEUE_NAME,
                           help="Set queue name to pass to LSF job submission command.")
 
         parser.add_argument("--parallel_mode", action="store", 
@@ -111,12 +111,12 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
 
         parser.add_argument("--bsub_exclusive_mode", action="store_true",
                           dest="bsub_exclusive_mode", required=False,
-                          help="[ADVANCED] run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
+                          help="[ADVANCED] For LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
 
-        parser.add_argument("--bsub_mem_limit", action="store", type=int, 
-                          dest="bsub_mem_limit", required=False,
+        parser.add_argument("--mem_limit", action="store", type=int, 
+                          dest="mem_limit", required=False,
                           default=4,
-                          help="[ADVANCED] run bsub with -M mem_limit option.  Defaults to 4GB")
+                          help="[ADVANCED] For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
 
         parser.add_argument("-l", "--loglevel", action="store",
                           dest="loglevel", default="OFF", choices=['OFF', 'DEBUG', 'CRITICAL'], required=False,
@@ -175,15 +175,18 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
         
         notes = "Behavioral run, using filter: %s" % (options.behavioral_filter,)
         
-        if options.simulator_path:
-            run_cmd = RHESSysCalibrator.getRunCmdSim(options.simulator_path)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(options.simulator_path)
-        elif "lsf" == options.parallel_mode:
-            run_cmd = RHESSysCalibrator.getRunCmd(options.bsub_mem_limit, options.bsub_exclusive_mode)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
-        else:
-            run_cmd = run_status_cmd = None
-        
+        run_cmd = run_stats_cmd = None
+        if options.parallel_mode == calibrator.PARALLEL_MODE_LSF:
+            # Check for simulator_path, setup job commands accordingly
+            if options.simulator_path:
+                run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
+                run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
+            else:
+                run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
+                                                      mem_limit=options.mem_limit, 
+                                                      bsub_exclusive_mode=options.bsub_exclusive_mode)
+                run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
+
         try:
             dbPath = RHESSysCalibrator.getDBPath(self.basedir)
             self.calibratorDB = ModelRunnerDB(dbPath)
@@ -266,7 +269,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, options.parallel_mode, options.processes, options.polling_delay,
-                                                                       options.lsf_queue, run_cmd, run_status_cmd)
+                                                                       options.queue_name, run_cmd, run_status_cmd)
             
             # Dispatch runs to consumer
             # Note: we're iterating over behavioral runs to get their paramter values

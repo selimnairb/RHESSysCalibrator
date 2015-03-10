@@ -61,9 +61,14 @@ from rhessyscalibrator.calibration_runner import *
 from rhessyscalibrator.calibration_parameters import *
 
 # Constants
-DEFAULT_LSF_QUEUE = 'day'
-LSF_QUEUES = ["day", "debug", "hour", "week", "bigmem"]
-PARALLEL_MODES = ["lsf", "process"]
+DEFAULT_QUEUE_NAME = 'day'
+PARALLEL_MODE_LSF = 'lsf'
+PARALLEL_MODE_PBS = 'pbs'
+PARALLEL_MODE_PROCESS = 'process'
+PARALLEL_MODES = [PARALLEL_MODE_LSF, 
+                  PARALLEL_MODE_PBS, 
+                  PARALLEL_MODE_PROCESS]
+DEFAULT_PARALLEL_MODE = PARALLEL_MODE_LSF
 
 MAX_ITERATIONS = 10000
 MAX_PROCESSORS = 1024
@@ -108,7 +113,7 @@ class RHESSysCalibrator(object):
     @classmethod
     def initializeCalibrationRunnerConsumers(cls, basedir, logger, 
                                              session_id, parallel_mode, num_processes, polling_delay, 
-                                             lsf_queue=None, run_cmd=None, run_status_cmd=None,
+                                             queue_name=None, run_cmd=None, run_status_cmd=None,
                                              restart_runs=False):
         """ Initialize a set of one or more CalibrationRunner objects
             to be used for executing calibration runs.
@@ -120,17 +125,17 @@ class RHESSysCalibrator(object):
         consumers = []
         runQueue = multiprocessing.JoinableQueue(num_processes)
         
-        if "lsf" == parallel_mode:
+        if PARALLEL_MODE_LSF == parallel_mode:
             # LSF will run our jobs us, so there is only one comsumer
             num_consumers = 1
-        elif "process" == parallel_mode:
+        elif PARALLEL_MODE_PROCESS == parallel_mode:
             # We will run our jobs, so we need options.process consumer threads
             num_consumers = num_processes
         
         for i in range(1, num_consumers + 1):
             # Create CalibrationRunner object (consumer)
-            if "lsf" == parallel_mode:
-                assert(lsf_queue is not None)
+            if PARALLEL_MODE_LSF == parallel_mode:
+                assert(queue_name is not None)
                 assert(run_cmd is not None)
                 assert(run_status_cmd is not None)
                 consumer = CalibrationRunnerQueueLSF(basedir,
@@ -138,13 +143,13 @@ class RHESSysCalibrator(object):
                                                      runQueue,
                                                      num_processes,
                                                      RHESSysCalibrator.getDBPath(basedir),
-                                                     lsf_queue,
+                                                     queue_name,
                                                      polling_delay,
                                                      run_cmd,
                                                      run_status_cmd,
                                                      logger,
                                                      restart_runs)
-            elif "process" == parallel_mode:
+            elif PARALLEL_MODE_PROCESS == parallel_mode:
                 consumer = CalibrationRunnerSubprocess(basedir,
                                                        session_id,
                                                        runQueue,
@@ -161,33 +166,60 @@ class RHESSysCalibrator(object):
         return (runQueue, consumers)
     
     @classmethod
-    def getRunCmd(cls, mem_limit, bsub_exclusive_mode=False):
-        """ Get LSF job submission command given selected options
+    def getRunCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE,
+                  *args, **kwargs):
+        """ Get job submission command given selected options
             
-            @param mem_limit Integer >=1
-            @param bsub_exclusive_mode Boolean
+            @parallel_mode String, one of PARALLEL_MODES
             
-            @return String representing job submission command
+            Valid keyword args:
+            @param mem_limit Integer >=1, units GB. Default: 1
+            @param bsub_exclusive_mode Boolean. Valid only for PARALLEL_MODE_LSF. Default: False
+            @param rhessys_path String. Valid only for PARALLEL_MODE_PBS. Default: os.getcwd()
+            
+            @return String representing job submission command, None if
+            parallel_mode does not support this operation.
+            
+            @raise Exception if unable to form command due to missing arguments
         """
+        mem_limit = int(kwargs.get('mem_limit', '1'))
+        
         assert(mem_limit >= 1)
         
-        if bsub_exclusive_mode:
-            run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
-        else:
-            run_cmd = "bsub -n 1,1"
-        run_cmd += " -M " + str(mem_limit)
+        run_cmd = None
+        
+        if parallel_mode == PARALLEL_MODE_LSF:
+            bsub_exclusive_mode = bool(kwargs.get('bsub_exclusive_mode', False))
+            if bsub_exclusive_mode:
+                run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
+            else:
+                run_cmd = "bsub -n 1,1"
+            run_cmd += " -M " + str(mem_limit)
+            
+        elif parallel_mode == PARALLEL_MODE_PBS:
+            rhessys_path = kwargs.get('rhessys_path', os.getcwd())
+            run_cmd = "qsub -l nodes=1:ppn=1,vmem={mem_limit} -w {rhessys_path} -d {rhessys_path}".format(mem_limit=mem_limit,
+                                                                                                          rhessys_path=rhessys_path) # TODO verify
         return run_cmd
     
     @classmethod
-    def getRunStatusCmd(cls):
-        """ Get LSF job status command
+    def getRunStatusCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE):
+        """ Get job status command
+        
+            @parallel_mode String, one of PARALLEL_MODES
     
-            @return String representing job status command
+            @return String representing job status command, None if
+            parallel_mode does not support this operation.
         """
-        return "bjobs"
+        status_cmd = None
+        
+        if parallel_mode == PARALLEL_MODE_LSF:
+            status_cmd = "bjobs"
+        elif parallel_mode == PARALLEL_MODE_PBS:
+            status_cmd = "qstat"
     
     @classmethod
-    def getRunCmdSim(cls, simulator_path):
+    def getRunCmdLSFSim(cls, simulator_path):
         """ Get LSF simulator job submission command
             
             @param simulator_path String representing path to LSF simulator
@@ -197,7 +229,7 @@ class RHESSysCalibrator(object):
         return os.path.join(simulator_path, "bsub.py")
     
     @classmethod
-    def getRunStatusCmdSim(cls, simulator_path):
+    def getRunStatusCmdLSFSim(cls, simulator_path):
         """ Get LSF simulator job status command
             
             @param simulator_path String representing path to LSF simulator
@@ -991,12 +1023,12 @@ obs/                       Where you will store observed data to be compared to
                           help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
 
         parser.add_option("-q", "--queue", action="store",
-                          type="string", dest="lsf_queue",
+                          type="string", dest="queue_name",
                           help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
 
         parser.add_option("--parallel_mode", action="store", 
                           type="string", dest="parallel_mode",
-                          help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], process")
+                          help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], pbs, process")
 
         parser.add_option("--polling_delay", action="store",
                           type="int", dest="polling_delay",
@@ -1008,12 +1040,12 @@ obs/                       Where you will store observed data to be compared to
         
         parser.add_option("--bsub_exclusive_mode", action="store_true",
                           dest="bsub_exclusive_mode",
-                          help="[ADVANCED; OPTIONAL] run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
+                          help="[ADVANCED; OPTIONAL] For LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
 
         parser.add_option("--mem_limit", action="store",
                           type="int", dest="mem_limit",
                           default=4,
-                          help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 4GB")
+                          help="[ADVANCED; OPTIONAL] For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
 
         (options, args) = parser.parse_args()
 
@@ -1065,16 +1097,14 @@ with the calibration session""")
             options.notes = None
 
         if not options.parallel_mode:
-            options.parallel_mode = "lsf"
+            options.parallel_mode = PARALLEL_MODE_LSF
         elif not options.parallel_mode in PARALLEL_MODES:
             parser.error("""Please specify a valid parallel mode.  See PARALLEL_MODES in %prog""")
 
-        assert( ("lsf" == options.parallel_mode) or ("process" == options.parallel_mode))
+        assert( (PARALLEL_MODE_LSF == options.parallel_mode) or (PARALLEL_MODE_PROCESS == options.parallel_mode))
 
-        if not options.lsf_queue:
-            options.lsf_queue = DEFAULT_LSF_QUEUE
-        elif not options.lsf_queue in LSF_QUEUES:
-            parser.error("""Please specify a valid queue.  See LSF_QUEUES in %prog""")
+        if not options.queue_name:
+            options.queue_name = DEFAULT_QUEUE_NAME
         
         if not options.polling_delay:
             options.polling_delay = 1
@@ -1094,13 +1124,17 @@ with the calibration session""")
         self.logger.debug("iterations: %d" % options.iterations)
         self.logger.debug("jobs: %d" % options.processes)
 
-        # Check for simulator_path, setup job commands accordingly
-        if options.simulator_path:
-            run_cmd = RHESSysCalibrator.getRunCmdSim(options.simulator_path)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(options.simulator_path)
-        else:
-            run_cmd = RHESSysCalibrator.getRunCmd(options.mem_limit, options.bsub_exclusive_mode)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
+        run_cmd = run_stats_cmd = None
+        if options.parallel_mode == PARALLEL_MODE_LSF:
+            # Check for simulator_path, setup job commands accordingly
+            if options.simulator_path:
+                run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
+                run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
+            else:
+                run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
+                                                      mem_limit=options.mem_limit, 
+                                                      bsub_exclusive_mode=options.bsub_exclusive_mode)
+                run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
 
         # Main events take place herein ...
         try:
@@ -1160,7 +1194,7 @@ with the calibration session""")
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, options.parallel_mode, options.processes, options.polling_delay,
-                                                                       options.lsf_queue, run_cmd, run_status_cmd)
+                                                                       options.queue_name, run_cmd, run_status_cmd)
 
             # Dispatch runs to consumer
             # For each iteration (from 1 to options.iterations+1)
@@ -1204,7 +1238,7 @@ with the calibration session""")
                     run.cmd_raw = self.getCmdRawForRun(cmd_raw_proto,
                                                        run.output_path)
         
-                    if "process" == options.parallel_mode:
+                    if PARALLEL_MODE_PROCESS == options.parallel_mode:
                         # Set job ID if we are in process parallel mode
                         #   (in lsf mode, we will use the LSF job number instead of itr)
                         run.job_id = itr
@@ -1259,7 +1293,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                             dest="simulator_path",
                             help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
         parser.add_argument("-q", "--queue",
-                            dest="lsf_queue", choices=LSF_QUEUES, default=DEFAULT_LSF_QUEUE,
+                            dest="queue_name", default=DEFAULT_QUEUE_NAME,
                             help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
         parser.add_argument("--parallel_mode",
                             dest="parallel_mode", choices=PARALLEL_MODES,
@@ -1272,11 +1306,11 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                             help="[ADVANCED; OPTIONAL] use The same m and K parameters for horizontal (i.e. -s) as well as vertical (i.e. -sv ) directions.  Defaults to false.")
         parser.add_argument("--bsub_exclusive_mode", action="store_true",
                             dest="bsub_exclusive_mode",
-                            help="[ADVANCED; OPTIONAL] run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
+                            help="[ADVANCED; OPTIONAL] For LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
         parser.add_argument("--mem_limit",
                             type=int, dest="mem_limit",
                             default=4,
-                            help="[ADVANCED; OPTIONAL] run bsub with -M mem_limit option.  Defaults to 4GB")
+                            help="[ADVANCED; OPTIONAL] For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
 
         args = parser.parse_args()
         
@@ -1339,13 +1373,18 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
 
         
-        # Check for simulator_path, setup job commands accordingly
-        if args.simulator_path:
-            run_cmd = RHESSysCalibrator.getRunCmdSim(args.simulator_path)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmdSim(args.simulator_path)
-        else:
-            run_cmd = RHESSysCalibrator.getRunCmd(args.mem_limit, args.bsub_exclusive_mode)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmd()
+        run_cmd = run_stats_cmd = None
+        if args.parallel_mode == PARALLEL_MODE_LSF:
+            # Check for simulator_path, setup job commands accordingly
+            if args.simulator_path:
+                run_cmd = RHESSysCalibrator.getRunCmdLSFSim(args.simulator_path)
+                run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(args.simulator_path)
+            else:
+                run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=args.parallel_mode,
+                                                      mem_limit=args.mem_limit, 
+                                                      bsub_exclusive_mode=args.bsub_exclusive_mode)
+                run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=args.parallel_mode)
+
         
         try:
             calibratorDB = \
@@ -1422,7 +1461,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
-                                                                       args.lsf_queue, run_cmd, run_status_cmd,
+                                                                       args.queue_name, run_cmd, run_status_cmd,
                                                                        restart_runs=True)
             for run in runsToRestart:
                 # Dispatch to consumer
@@ -1443,7 +1482,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
-                                                                       args.lsf_queue, run_cmd, run_status_cmd)
+                                                                       args.queue_name, run_cmd, run_status_cmd)
             
             # For each new run (from 1 to numNewRuns+1)
             iterations = numNewRuns + 1 # make sure we get all N
@@ -1487,7 +1526,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                     run.cmd_raw = self.getCmdRawForRun(cmd_raw_proto,
                                                        run.output_path)
         
-                    if "process" == args.parallel_mode:
+                    if PARALLEL_MODE_PROCESS == args.parallel_mode:
                         # Set job ID if we are in process parallel mode
                         #   (in lsf mode, we will use the LSF job number instead of runId)
                         run.job_id = runId
