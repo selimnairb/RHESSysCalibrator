@@ -125,11 +125,10 @@ class RHESSysCalibrator(object):
         consumers = []
         runQueue = multiprocessing.JoinableQueue(num_processes)
         
-        if PARALLEL_MODE_LSF == parallel_mode:
-            # LSF will run our jobs us, so there is only one comsumer
-            num_consumers = 1
-        elif PARALLEL_MODE_PROCESS == parallel_mode:
-            # We will run our jobs, so we need options.process consumer threads
+        # Job schedulers will run our jobs us, so there is only one comsumer
+        num_consumers = 1
+        if PARALLEL_MODE_PROCESS == parallel_mode:
+            # We will run our jobs, so we need num_processes consumer processes
             num_consumers = num_processes
         
         for i in range(1, num_consumers + 1):
@@ -1298,8 +1297,8 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                             dest="queue_name", default=DEFAULT_QUEUE_NAME,
                             help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
         parser.add_argument("--parallel_mode",
-                            dest="parallel_mode", choices=PARALLEL_MODES,
-                            help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], process")
+                            dest="parallel_mode", choices=PARALLEL_MODES, default=DEFAULT_PARALLEL_MODE,
+                            help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], pbs, process")
         parser.add_argument("--polling_delay", default=1,
                             type=int, dest="polling_delay",
                             help="[ADVANCED; OPTIONAL] set multiplier for how long to wait in between successive pollings of job status.  Default polling delay is 60 seconds, thus a multiplier of 5 will result in a delay of 5 minutes instead of 1 minute.")
