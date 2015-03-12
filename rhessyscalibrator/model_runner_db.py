@@ -5,7 +5,7 @@
 This software is provided free of charge under the New BSD License. Please see
 the following license information:
 
-Copyright (c) 2013, University of North Carolina at Chapel Hill
+Copyright (c) 2013-2015, University of North Carolina at Chapel Hill
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -118,7 +118,7 @@ param_svalt1 REAL,
 param_svalt2 REAL,
 cmd_raw TEXT NOT NULL,
 output_path TEXT NOT NULL,
-job_id INTEGER NOT NULL,
+job_id TEXT NOT NULL,
 status TEXT NOT NULL
 CHECK (status="PEND" OR status="RUN" OR status="PUSP" OR 
 status="USUSP" OR status="SSUSP" OR status="DONE" OR 
@@ -276,7 +276,7 @@ WHERE session_id=?""", (session_id,))
                   param_vgsen1, param_vgsen2, param_vgsen3,
                   param_svalt1, param_svalt2,
                   cmd_raw, output_path,
-                  lsf_job_id,
+                  job_id,
                   fitness_period=None,
                   nse=None, nse_log=None, 
                   pbias=None, rsr=None,
@@ -314,7 +314,7 @@ WHERE session_id=?""", (session_id,))
                                      of RHESSys
             @param output_path String representing the dir where results for this run are 
                                      stored
-            @param job_id Integer representing the LSF job ID associated with this run
+            @param job_id String representing the job ID associated with this run
             @param fitness_period String indicating time step over which 
                                       all fitness results were calculated.
                                       One of: daily, monthly, yearly
@@ -349,7 +349,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         param_vgsen1, param_vgsen2, param_vgsen3,
                         param_svalt1, param_svalt2,
                         cmd_raw, output_path,
-                        lsf_job_id, "PEND",
+                        job_id, "PEND",
                         nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period))
 
         self._conn.commit()
@@ -426,7 +426,7 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
         """ Updates the job_id of the given run.  
 
             @param id Integer representing the ID of the run to update
-            @param job_id The job ID of the run
+            @param job_id String representing the job ID of the run
             
         """
         cursor = self._conn.cursor()
@@ -556,11 +556,11 @@ WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, i
         return runs
 
 
-    def getRunInSession(self, session_id, lsf_job_id):
+    def getRunInSession(self, session_id, job_id):
         """ Get all runs associated with a session
 
             @param session_id Integer representing the session whose list of runs we want
-            @param job_id Integer representing job ID of run to retrieve
+            @param job_id String representing job ID of run to retrieve
 
             @return ModelRun object
             
@@ -572,7 +572,7 @@ WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, i
 
         cursor.execute("""SELECT * from run WHERE session_id=? AND
 job_id=?""", 
-                       (session_id, lsf_job_id))
+                       (session_id, job_id))
         row = cursor.fetchone()
         if row != None:
             run = self._runRecordToObject(row)

@@ -180,6 +180,8 @@ class RHESSysCalibrator(object):
             parallel_mode does not support this operation.
             
             @raise Exception if unable to form command due to missing arguments
+            
+            @todo This logic should be moved to the concrete calibration runners.
         """
         mem_limit = int(kwargs.get('mem_limit', '1'))
         
@@ -196,9 +198,9 @@ class RHESSysCalibrator(object):
             run_cmd += " -M " + str(mem_limit)
             
         elif parallel_mode == PARALLEL_MODE_PBS:
-            rhessys_path = kwargs.get('rhessys_path', os.getcwd())
-            run_cmd = "qsub -l nodes=1:ppn=1,vmem={mem_limit} -w {rhessys_path} -d {rhessys_path}".format(mem_limit=mem_limit,
-                                                                                                          rhessys_path=rhessys_path) # TODO verify
+            rhessys_path = os.path.abspath(kwargs.get('rhessys_path', os.getcwd()))
+            run_cmd = "qsub -l nodes=1:ppn=1,vmem={mem_limit} -d {rhessys_path}".format(mem_limit=mem_limit,
+                                                                                        rhessys_path=rhessys_path) # TODO verify
         return run_cmd
     
     @classmethod
@@ -209,6 +211,8 @@ class RHESSysCalibrator(object):
     
             @return String representing job status command, None if
             parallel_mode does not support this operation.
+            
+            @todo This logic should be moved to the concrete calibration runners.
         """
         status_cmd = None
         
@@ -1241,8 +1245,8 @@ with the calibration session""")
         
                     if PARALLEL_MODE_PROCESS == options.parallel_mode:
                         # Set job ID if we are in process parallel mode
-                        #   (in lsf mode, we will use the LSF job number instead of itr)
-                        run.job_id = itr
+                        #   (in non-process mode, we will use the job number given back by the queueing system instead of itr)
+                        run.job_id = str(itr)
         
                     # Dispatch to consumer
                     runQueue.put(run)

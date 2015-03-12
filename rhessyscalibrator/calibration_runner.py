@@ -227,20 +227,20 @@ class CalibrationRunnerLSF(CalibrationRunner):
     JOB_SUBMIT_PENDING_THRESHOLD_SLEEP_SECS = 90
 
     def __init__(self, basedir, session_id, max_active_jobs,
-                 db_path, lsf_queue, polling_delay, 
-                 bsub_cmd, bjobs_cmd, logger, restart_runs=False):
+                 db_path, queue, polling_delay, 
+                 run_cmd, run_status_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
             @param max_active_jobs Integer representing the max active jobs permitted
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
-            @param lsf_queue String representing the name of the LSF queue to submit
+            @param queue String representing the name of the queue to submit
                                     jobs to
             @param polling_delay Integer representing the multiplier to applied to
                                     self.JOB_STATUS_SLEEP_SECS
-            @param bsub_cmd String representing the command to use to submit jobs
-            @param bjobs_cmd String representing the command to use to poll job status
+            @param run_cmd String representing the command to use to submit jobs
+            @param run_status_cmd String representing the command to use to poll job status
             @param logger logging.Logger to use to for debug messages
             @param restart_runs Boolean indicating that runs are to be restarted 
         """
@@ -248,7 +248,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
         self.session_id = session_id
         self.max_active_jobs = max_active_jobs
         self.db_path = db_path
-        self.lsf_queue = lsf_queue
+        self.queue = queue
         self.JOB_STATUS_SLEEP_SECS *= polling_delay
         self.logger = logger
         self.restart_runs = restart_runs
@@ -258,8 +258,8 @@ class CalibrationRunnerLSF(CalibrationRunner):
         # active jobs are those jobs that have be submitted via submitJobLSF 
         self.numActiveJobs = 0
 
-        self.__bsubCmd = bsub_cmd
-        self.__bjobsCmd = bjobs_cmd
+        self.__bsubCmd = run_cmd
+        self.__bjobsCmd = run_status_cmd
         self.__bsubRegex = re.compile("^Job\s<([0-9]+)>\s.+$")
         self.__bsubErrRegex = re.compile("^User <\w+>: Pending job threshold reached. Retrying in 60 seconds...")
         self.__bjobsRegex = re.compile("^([0-9]+)\s+\w+\s+(\w+)\s+.+$")
@@ -289,8 +289,8 @@ class CalibrationRunnerLSF(CalibrationRunner):
         """
         # Call bsub
         bsub_cmd = self.__bsubCmd
-        if None != self.lsf_queue:
-            bsub_cmd += " -q " + self.lsf_queue
+        if None != self.queue:
+            bsub_cmd += " -q " + self.queue
         bsub_cmd += " -o " + job.output_path + " " + job.cmd_raw
         self.logger.debug("Running bsub: %s" % bsub_cmd)
         process = Popen(bsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
@@ -298,7 +298,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
         
         (process_stdout, process_stderr) = process.communicate()    
         
-        # Read job id from bsub outupt (e.g. "Job <ID> is submitted ..."
+        # Read job id from bsub outupt (e.g. "Job <ID> is submitted ...")
         self.logger.critical("stdout from bsub: %s" % process_stdout)
         self.logger.critical("stderr from bsub: %s" % process_stderr)
         match = self.__bsubRegex.match(process_stdout)
@@ -424,19 +424,19 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
 
     def __init__(self, basedir, session_id, queue, max_active_jobs,
                  db_path, lsf_queue, polling_delay, 
-                 bsub_cmd, bjobs_cmd, logger, restart_runs=False):
+                 run_cmd, run_status_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
             @param max_active_jobs Integer representing the max active jobs permitted
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
-            @param lsf_queue String representing the name of the LSF queue to submit
+            @param queue String representing the name of the LSF queue to submit
                                     jobs to
             @param polling_delay Integer representing the multiplier to applied to
                                     self.JOB_STATUS_SLEEP_SECS
-            @param bsub_cmd String representing the command to use to submit jobs
-            @param bjobs_cmd String representing the command to use to poll job status
+            @param run_cmd String representing the command to use to submit jobs
+            @param run_status_cmd String representing the command to use to poll job status
             @param logger logging.Logger to use to for debug messages
             @param restart_runs Boolean indicating that runs are to be restarted 
         """
@@ -445,7 +445,7 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
                                                         db_path,
                                                         lsf_queue,
                                                         polling_delay,
-                                                        bsub_cmd, bjobs_cmd,
+                                                        run_cmd, run_status_cmd,
                                                         logger,
                                                         restart_runs=restart_runs)
         self._queue = queue
@@ -509,3 +509,201 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
                     self._queue.task_done()
                     self.numActiveJobs -= 1
                 break
+            
+    class CalibrationRunnerPBS(CalibrationRunner):
+        """ CalibrationRunner for use with PBS/TORQUE job management tools.
+
+        """
+        INIT_SLEEP_SECS = 15
+        JOB_STATUS_SLEEP_SECS = 60
+        JOB_SUBMIT_PENDING_THRESHOLD_SLEEP_SECS = 90
+        
+        QUEUE_GET_TIMEOUT_SECS = 15
+        EXIT_SLEEP_SECS = 5
+    
+        def __init__(self, basedir, session_id, max_active_jobs,
+                     db_path, queue, polling_delay, 
+                     run_cmd, run_status_cmd, logger, restart_runs=False):
+            """ 
+                @param basedir String representing the basedir of the calibration session
+                @param session_id Integer representing the session ID of current calibration session
+                @param max_active_jobs Integer representing the max active jobs permitted
+                @param db_path String representing the path of sqlite DB to store the 
+                                        job (run) in
+                @param queue String representing the name of the queue to submit
+                                        jobs to
+                @param polling_delay Integer representing the multiplier to applied to
+                                        self.JOB_STATUS_SLEEP_SECS
+                @param run_cmd String representing the command to use to submit jobs
+                @param run_status_cmd String representing the command to use to poll job status
+                @param logger logging.Logger to use to for debug messages
+                @param restart_runs Boolean indicating that runs are to be restarted 
+            """
+            self.basedir = basedir
+            self.session_id = session_id
+            self.max_active_jobs = max_active_jobs
+            self.db_path = db_path
+            self.queue = queue
+            self.JOB_STATUS_SLEEP_SECS *= polling_delay
+            self.logger = logger
+            self.restart_runs = restart_runs
+    
+            self.db = ModelRunnerDB(db_path)
+            
+            # active jobs are those jobs that have be submitted via submitJobLSF 
+            self.numActiveJobs = 0
+    
+            self.qsubCmd = run_cmd
+            self.qstatCmd = run_status_cmd
+            self.qsubRegex = re.compile("^([0-9]+)\.(\w+)$")
+            #self.__bsubErrRegex = re.compile("^User <\w+>: Pending job threshold reached. Retrying in 60 seconds...")
+            self.qstatRegex = re.compile("^([0-9]+)\.(\w+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s\S+$")
+    
+            self.rhessys_base = os.path.join(self.basedir, "rhessys")
+            
+        def __del__(self):
+            self.db.close()
+            self.db = None
+    
+        def jobCompleteCallback(self, job_id, run):
+            """ Called when a job is complete.  Calls self._queue.task_done()
+    
+                @param job_id Integer representing the LSF job_id of the run that comlpeted
+                @param run model_runner_db.ModelRun representing the run that has
+                                                              completed
+            """
+            self._queue.task_done()
+            
+        def submitJobPBS(self, job):
+            """ Submit a job using PBS/TORQUE.  Will add job to DB.
+            
+                @param job model_runner_db.ModelRun representing the job to run
+                
+                @raise Exception if qsub output is not what was expected
+            """
+            # Make script for running this model run
+            script_filename = os.path.abspath(os.path.join(job.output_path, 'pbs.script'))
+            script = open(script_filename, 'w')
+            script.write('#!/bin/bash\n\n')
+            script.write(job.cmd_raw)
+            script.write('\n')
+            script.close()
+            
+            # Build qsub command line
+            stdout_file = os.path.abspath(os.path.join(job.output_path, 'pbs.out'))
+            stderr_file = os.path.abspath(os.path.join(job.output_path, 'pbs.err'))
+            qsub_cmd = self.qsubCmd
+            if None != self.queue:
+                qsub_cmd += ' -q ' + self.queue
+            qsub_cmd += ' -o ' + stdout_file + ' -e ' + stderr_file
+            qsub_cmd += ' ' + script_filename
+            
+            # Run qsub
+            self.logger.debug("Running qsub: %s" % qsub_cmd)
+            process = Popen(qsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
+                            cwd=self.rhessys_base, bufsize=1)
+            
+            (process_stdout, process_stderr) = process.communicate()    
+            
+            # Read job id from bsub outupt (e.g. "Job <ID> is submitted ...")
+            self.logger.critical("stdout from qsub: %s" % process_stdout)
+            self.logger.critical("stderr from qsub: %s" % process_stderr)
+            match = self.qsubRegex.match(process_stdout)
+            if None == match:
+                raise Exception("Error while reading output from qsub:\ncmd: %s\n\n|%s|\n%s,\npattern: |%s|" %
+                                (qsub_cmd, process_stdout, process_stderr, 
+                                 self.qsubRegex.pattern))
+            self.numActiveJobs += 1
+            job.job_id = match.group(1)
+            
+            if self.restart_runs:
+                # Ensure run to restart exists
+                run = self.db.getRun(job.id)
+                if run is None:
+                    raise Exception("Run %d does not exist and cannot be restarted" % (job.id,) )
+                # Update job_id
+                self.db.updateRunJobId(job.id, job.job_id)
+            else:
+                # New run, store in ModelRunnerDB (insertRun)
+                insertedRunID = self.db.insertRun(job.session_id,
+                                                  job.worldfile,
+                                                  job.param_s1, job.param_s2,
+                                                  job.param_s3, job.param_sv1,
+                                                  job.param_sv2, job.param_gw1,
+                                                  job.param_gw2, job.param_vgsen1,
+                                                  job.param_vgsen2, job.param_vgsen3,
+                                                  job.param_svalt1, job.param_svalt2,
+                                                  job.cmd_raw,
+                                                  job.output_path,
+                                                  job.job_id,
+                                                  job.fitness_period,
+                                                  job.nse, job.nse_log,
+                                                  job.pbias, job.rsr,
+                                                  job.user1, job.user2, job.user3)
+                job.id = insertedRunID
+                
+            self.logger.critical("Run %s submitted as job %s" % 
+                                 (job.id, job.job_id))
+    
+        def pollJobsStatusPBS(self):
+            """ Check status of jobs submitted to PBS/TORQUE.  Will update status
+                for each job (run) in the DB.
+                
+                @return Tuple (integer, integer, integer) that represent 
+                the number of pending, running, and retired jobs for the 
+                current invocation.
+    
+                @raise Exception if qstat output is not what was expected.
+            """
+            pass
+    
+        def run(self):
+            """ Method to be run in a consumer thread/process to launch a run
+                submitted by procuder thread/process
+            """
+            # Wait for a bit for jobs to be submitted to the queue
+            time.sleep(self.INIT_SLEEP_SECS)
+            while True:
+                pendingJobs = 0
+                runningJobs = 0
+                retiredJobs = 0
+                self.logger.critical("Active jobs: %d" % (self.numActiveJobs))
+                self.logger.critical("Queue full: %d" % (self._queue.full()))
+                try:
+                    if self.numActiveJobs < self.max_active_jobs:
+                        self.logger.critical("numActiveJobs < %d" % (self.max_active_jobs,))
+                        # Only try to run a new job if < self.max_active_jobs
+                        #  jobs are currently active
+                        run = self._queue.get(block=True, 
+                                               timeout=self.QUEUE_GET_TIMEOUT_SECS)
+                        # Submit a job
+                        self.submitJobPBS(run)
+                    else:
+                        self.logger.critical("numActiveJobs >= max_active_jobs, sleeping ...")
+                        time.sleep(self.JOB_STATUS_SLEEP_SECS)
+    
+                    # Check for job completion
+                    (pendingJobs, runningJobs, retiredJobs) = \
+                        self.pollJobsStatusPBS()                                   
+                    self.numActiveJobs -= retiredJobs
+    
+                except Queue.Empty:
+                    self.logger.critical("Queue.Empty")
+    
+                    # Wait for jobs to finish                                   
+                    (pendingJobs, runningJobs, retiredJobs) = \
+                        self.pollJobsStatusPBS()
+                    self.numActiveJobs -= retiredJobs
+                    while pendingJobs > 0 or runningJobs > 0:
+                        # Make sure we're not too aggressively polling job status
+                        time.sleep(self.JOB_STATUS_SLEEP_SECS)
+                        (pendingJobs, runningJobs, retiredJobs) = \
+                            self.pollJobsStatusPBS()
+                        self.numActiveJobs -= retiredJobs
+    
+                    # Kludge to make sure we call self._queue.task_done() enough
+                    time.sleep(self.EXIT_SLEEP_SECS)
+                    while self.numActiveJobs > 0:
+                        self._queue.task_done()
+                        self.numActiveJobs -= 1
+                    break
