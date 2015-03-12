@@ -8,7 +8,7 @@ management.
 This software is provided free of charge under the New BSD License. Please see
 the following license information:
 
-Copyright (c) 2013, University of North Carolina at Chapel Hill
+Copyright (c) 2013-2015, University of North Carolina at Chapel Hill
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -133,7 +133,6 @@ class RHESSysCalibrator(object):
         
         for i in range(1, num_consumers + 1):
             # Create CalibrationRunner object (consumer)
-            consumer = None
             if PARALLEL_MODE_LSF == parallel_mode:
                 assert(queue_name is not None)
                 assert(run_cmd is not None)
@@ -149,6 +148,21 @@ class RHESSysCalibrator(object):
                                                      run_status_cmd,
                                                      logger,
                                                      restart_runs)
+            elif PARALLEL_MODE_PBS == parallel_mode:
+                assert(queue_name is not None)
+                assert(run_cmd is not None)
+                assert(run_status_cmd is not None)
+                consumer = CalibrationRunnerPBS(basedir,
+                                                session_id,
+                                                runQueue,
+                                                num_processes,
+                                                RHESSysCalibrator.getDBPath(basedir),
+                                                queue_name,
+                                                polling_delay,
+                                                run_cmd,
+                                                run_status_cmd,
+                                                logger,
+                                                restart_runs)
             elif PARALLEL_MODE_PROCESS == parallel_mode:
                 consumer = CalibrationRunnerSubprocess(basedir,
                                                        session_id,
@@ -156,6 +170,8 @@ class RHESSysCalibrator(object):
                                                        RHESSysCalibrator.getDBPath(basedir),
                                                        logger,
                                                        restart_runs)
+            else:
+                consumer = None
             # Create process for consumer
             assert(consumer)
             proc = multiprocessing.Process(target=consumer.run,
