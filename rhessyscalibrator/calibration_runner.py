@@ -527,12 +527,14 @@ class CalibrationRunnerPBS(CalibrationRunner):
                   'W': 'WAIT', 'S': 'SSUSP'
                   }
 
-    def __init__(self, basedir, session_id, max_active_jobs,
+    def __init__(self, basedir, session_id, queue, max_active_jobs,
                  db_path, queue, polling_delay, 
                  run_cmd, run_status_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
+            @param queue String representing the name of the PBS queue to submit
+                                    jobs to
             @param max_active_jobs Integer representing the max active jobs permitted
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
