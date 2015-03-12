@@ -680,7 +680,7 @@ class CalibrationRunnerPBS(CalibrationRunner):
         # Call qstat
         qstat_cmd = self.qstatCmd
         process = Popen(qstat_cmd, shell=True, stdout=PIPE,
-                        cmd=self.rhessys_base)
+                        cwd=self.rhessys_base)
         (process_stdout, process_stderr) = process.communicate()
         # Read output, foreach job, update status in DB
         for line in string.split(process_stdout, '\n'):
