@@ -593,7 +593,8 @@ class CalibrationRunnerPBS(CalibrationRunner):
             @raise Exception if qsub output is not what was expected
         """
         # Make script for running this model run
-        script_filename = os.path.abspath(os.path.join(job.output_path, 'pbs.script'))
+        script_filename = os.path.abspath(os.path.join(self.rhessys_base, 
+                                                       job.output_path, 'pbs.script'))
         script = open(script_filename, 'w')
         script.write('#!/bin/bash\n\n')
         script.write(job.cmd_raw)
@@ -601,8 +602,10 @@ class CalibrationRunnerPBS(CalibrationRunner):
         script.close()
         
         # Build qsub command line
-        stdout_file = os.path.abspath(os.path.join(job.output_path, 'pbs.out'))
-        stderr_file = os.path.abspath(os.path.join(job.output_path, 'pbs.err'))
+        stdout_file = os.path.abspath(os.path.join(self.rhessys_base, 
+                                                   job.output_path, 'pbs.out'))
+        stderr_file = os.path.abspath(os.path.join(self.rhessys_base,
+                                                   job.output_path, 'pbs.err'))
         qsub_cmd = self.qsubCmd
         if None != self.submit_queue:
             qsub_cmd += ' -q ' + self.submit_queue
