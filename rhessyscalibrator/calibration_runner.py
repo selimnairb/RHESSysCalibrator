@@ -227,7 +227,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
     JOB_SUBMIT_PENDING_THRESHOLD_SLEEP_SECS = 90
 
     def __init__(self, basedir, session_id, max_active_jobs,
-                 db_path, queue, polling_delay, 
+                 db_path, submit_queue, polling_delay, 
                  run_cmd, run_status_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
@@ -235,7 +235,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
             @param max_active_jobs Integer representing the max active jobs permitted
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
-            @param queue String representing the name of the queue to submit
+            @param submit_queue String representing the name of the queue to submit
                                     jobs to
             @param polling_delay Integer representing the multiplier to applied to
                                     self.JOB_STATUS_SLEEP_SECS
@@ -248,7 +248,7 @@ class CalibrationRunnerLSF(CalibrationRunner):
         self.session_id = session_id
         self.max_active_jobs = max_active_jobs
         self.db_path = db_path
-        self.queue = queue
+        self.submit_queue = submit_queue
         self.JOB_STATUS_SLEEP_SECS *= polling_delay
         self.logger = logger
         self.restart_runs = restart_runs
@@ -289,8 +289,8 @@ class CalibrationRunnerLSF(CalibrationRunner):
         """
         # Call bsub
         bsub_cmd = self.__bsubCmd
-        if None != self.queue:
-            bsub_cmd += " -q " + self.queue
+        if None != self.submit_queue:
+            bsub_cmd += " -q " + self.submit_queue
         bsub_cmd += " -o " + job.output_path + " " + job.cmd_raw
         self.logger.debug("Running bsub: %s" % bsub_cmd)
         process = Popen(bsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
@@ -423,15 +423,17 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
     EXIT_SLEEP_SECS = 5
 
     def __init__(self, basedir, session_id, queue, max_active_jobs,
-                 db_path, lsf_queue, polling_delay, 
+                 db_path, submit_queue, polling_delay, 
                  run_cmd, run_status_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
+            @param queue Reference to Queue.Queue representing dispatch queue shared with
+                        producer thread
             @param max_active_jobs Integer representing the max active jobs permitted
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
-            @param queue String representing the name of the LSF queue to submit
+            @param submit_queue String representing the name of the queue to submit
                                     jobs to
             @param polling_delay Integer representing the multiplier to applied to
                                     self.JOB_STATUS_SLEEP_SECS
@@ -443,7 +445,7 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
         super(CalibrationRunnerQueueLSF, self).__init__(basedir, session_id,
                                                         max_active_jobs, 
                                                         db_path,
-                                                        lsf_queue,
+                                                        submit_queue,
                                                         polling_delay,
                                                         run_cmd, run_status_cmd,
                                                         logger,
@@ -528,7 +530,7 @@ class CalibrationRunnerPBS(CalibrationRunner):
                   }
 
     def __init__(self, basedir, session_id, queue, max_active_jobs,
-                 db_path, queue, polling_delay, 
+                 db_path, submit_queue, polling_delay, 
                  run_cmd, run_status_cmd, logger, restart_runs=False):
         """ 
             @param basedir String representing the basedir of the calibration session
@@ -538,7 +540,7 @@ class CalibrationRunnerPBS(CalibrationRunner):
             @param max_active_jobs Integer representing the max active jobs permitted
             @param db_path String representing the path of sqlite DB to store the 
                                     job (run) in
-            @param queue String representing the name of the queue to submit
+            @param submit_queue String representing the name of the queue to submit
                                     jobs to
             @param polling_delay Integer representing the multiplier to applied to
                                     self.JOB_STATUS_SLEEP_SECS
@@ -549,9 +551,10 @@ class CalibrationRunnerPBS(CalibrationRunner):
         """
         self.basedir = basedir
         self.session_id = session_id
+        self._queue = queue
         self.max_active_jobs = max_active_jobs
         self.db_path = db_path
-        self.queue = queue
+        self.submit_queue = submit_queue
         self.JOB_STATUS_SLEEP_SECS *= polling_delay
         self.logger = logger
         self.restart_runs = restart_runs
@@ -601,8 +604,8 @@ class CalibrationRunnerPBS(CalibrationRunner):
         stdout_file = os.path.abspath(os.path.join(job.output_path, 'pbs.out'))
         stderr_file = os.path.abspath(os.path.join(job.output_path, 'pbs.err'))
         qsub_cmd = self.qsubCmd
-        if None != self.queue:
-            qsub_cmd += ' -q ' + self.queue
+        if None != self.submit_queue:
+            qsub_cmd += ' -q ' + self.submit_queue
         qsub_cmd += ' -o ' + stdout_file + ' -e ' + stderr_file
         qsub_cmd += ' ' + script_filename
         
