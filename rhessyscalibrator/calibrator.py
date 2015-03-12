@@ -1150,16 +1150,15 @@ with the calibration session""")
         self.logger.debug("jobs: %d" % options.processes)
 
         run_cmd = run_status_cmd = None
-        if options.parallel_mode == PARALLEL_MODE_LSF:
-            # Check for simulator_path, setup job commands accordingly
-            if options.simulator_path:
-                run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
-                run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
-            else:
-                run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
-                                                      mem_limit=options.mem_limit, 
-                                                      bsub_exclusive_mode=options.bsub_exclusive_mode)
-                run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
+        # If in LSF mode, check for simulator_path, setup job commands accordingly
+        if options.parallel_mode == PARALLEL_MODE_LSF and options.simulator_path:
+            run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
+            run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
+        else:
+            run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
+                                                  mem_limit=options.mem_limit, 
+                                                  bsub_exclusive_mode=options.bsub_exclusive_mode)
+            run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
 
         # Main events take place herein ...
         try:
