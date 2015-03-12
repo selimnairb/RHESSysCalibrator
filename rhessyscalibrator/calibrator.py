@@ -1106,7 +1106,9 @@ with the calibration session""")
         elif not options.parallel_mode in PARALLEL_MODES:
             parser.error("""Please specify a valid parallel mode.  See PARALLEL_MODES in %prog""")
 
-        assert( (PARALLEL_MODE_LSF == options.parallel_mode) or (PARALLEL_MODE_PROCESS == options.parallel_mode))
+        assert( (PARALLEL_MODE_LSF == options.parallel_mode) or 
+                (PARALLEL_MODE_PBS == options.parallel_mode) or
+                (PARALLEL_MODE_PROCESS == options.parallel_mode))
 
         if not options.queue_name:
             options.queue_name = DEFAULT_QUEUE_NAME
