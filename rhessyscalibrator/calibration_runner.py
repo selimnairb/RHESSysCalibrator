@@ -520,6 +520,12 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
         
         QUEUE_GET_TIMEOUT_SECS = 15
         EXIT_SLEEP_SECS = 5
+        
+        # Map PBS job status codes to our own status codes
+        STATUS_MAP = {'C': 'DONE', 'E': 'EXIT', 'H': 'WAIT', 
+                      'Q': 'PEND', 'R': 'RUN', 'T': 'UNKWN',
+                      'W': 'WAIT', 'S': 'SSUSP'
+                      }
     
         def __init__(self, basedir, session_id, max_active_jobs,
                      db_path, queue, polling_delay, 
@@ -555,9 +561,9 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
     
             self.qsubCmd = run_cmd
             self.qstatCmd = run_status_cmd
-            self.qsubRegex = re.compile("^([0-9]+)\.(\w+)$")
+            self.qsubRegex = re.compile("^([0-9]+\.\S+)$")
             #self.__bsubErrRegex = re.compile("^User <\w+>: Pending job threshold reached. Retrying in 60 seconds...")
-            self.qstatRegex = re.compile("^([0-9]+)\.(\w+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s\S+$")
+            self.qstatRegex = re.compile("^([0-9]+\.\S+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s\S+$")
     
             self.rhessys_base = os.path.join(self.basedir, "rhessys")
             
@@ -605,7 +611,7 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
             
             (process_stdout, process_stderr) = process.communicate()    
             
-            # Read job id from bsub outupt (e.g. "Job <ID> is submitted ...")
+            # Read job id from bsub outupt (e.g. "<Job ID>")
             self.logger.critical("stdout from qsub: %s" % process_stdout)
             self.logger.critical("stderr from qsub: %s" % process_stderr)
             match = self.qsubRegex.match(process_stdout)
@@ -655,7 +661,62 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
     
                 @raise Exception if qstat output is not what was expected.
             """
-            pass
+            numPendingJobs = 0
+            numRunningJobs = 0
+            numRetiredJobs = 0
+            
+            # Get runs in session
+            #runs = self.db.getRunsInSession(self.session_id)
+            #job_ids = set([run.job_id for run in runs])
+            
+            # Call qstat
+            qstat_cmd = self.qstatCmd
+            process = Popen(qstat_cmd, shell=True, stdout=PIPE,
+                            cmd=self.rhessys_base)
+            (process_stdout, process_stderr) = process.communicate()
+            # Read output, foreach job, update status in DB
+            for line in string.split(process_stdout, '\n'):
+                self.logger.debug(line)
+                match = self.qstatRegex.match(line)
+                if None == match:
+                    # Don't choke on header or blank lines of qstat output.
+                    continue
+                job_id = match.group(1)
+                run = self.db.getRunInSession(self.session_id, job_id)
+                if None == run:
+                    # The run does not exist (potentially a run not
+                    # associated with our session, ignore it)
+                    continue
+                
+                # Job is ours, get status
+                stat = self.STATUS_MAP[match.group(2)]
+                self.logger.debug("job_id: %s, stat: %s; session_id: %s" % 
+                                  (job_id, stat, self.session_id))
+                
+                if "DONE" == run.status:
+                    # This job is already done, continue ...
+                    continue
+                elif "PEND" == stat:
+                    numPendingJobs += 1
+                elif "RUN" == stat:
+                    numRunningJobs += 1
+                    
+                if run.status != stat:
+                # Update status for run (implementation-specific)
+                    if "DONE" == stat or "EXIT" == stat:
+                        self.db.updateRunEndtime(run.id, datetime.utcnow(), stat)
+                        numRetiredJobs += 1;
+                        #  Job is DONE, call self.jobCompleteCallback
+                        self.logger.critical("Job %s (run %s) has completed (numRetired: %d), status set to %s, calling jobCompleteCallback" % \
+                                             (job_id, run.id, numRetiredJobs, stat))
+                        self.jobCompleteCallback(job_id, run)
+                    else:
+                        self.db.updateRunStatus(run.id, stat)
+    
+            self.logger.critical("There are %s jobs pending, and %s jobs running" %
+                                 (numPendingJobs, numRunningJobs))
+            self.logger.critical("numRetiredJobs: %s" % (numRetiredJobs,))
+            return (numPendingJobs, numRunningJobs, numRetiredJobs)                    
     
         def run(self):
             """ Method to be run in a consumer thread/process to launch a run
