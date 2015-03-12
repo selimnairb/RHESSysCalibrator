@@ -133,6 +133,7 @@ class RHESSysCalibrator(object):
         
         for i in range(1, num_consumers + 1):
             # Create CalibrationRunner object (consumer)
+            consumer = None
             if PARALLEL_MODE_LSF == parallel_mode:
                 assert(queue_name is not None)
                 assert(run_cmd is not None)
@@ -156,6 +157,7 @@ class RHESSysCalibrator(object):
                                                        logger,
                                                        restart_runs)
             # Create process for consumer
+            assert(consumer)
             proc = multiprocessing.Process(target=consumer.run,
                                            args=())
             consumers.append(proc)
