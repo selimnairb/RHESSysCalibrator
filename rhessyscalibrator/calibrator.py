@@ -1131,7 +1131,7 @@ with the calibration session""")
         self.logger.debug("iterations: %d" % options.iterations)
         self.logger.debug("jobs: %d" % options.processes)
 
-        run_cmd = run_stats_cmd = None
+        run_cmd = run_status_cmd = None
         if options.parallel_mode == PARALLEL_MODE_LSF:
             # Check for simulator_path, setup job commands accordingly
             if options.simulator_path:
