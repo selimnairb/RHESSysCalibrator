@@ -804,7 +804,7 @@ class CalibrationRunnerLSF(CalibrationRunnerQueue):
         if simulator_path:
             return os.path.join(simulator_path, "bjobs.py") 
         else:
-            return "bjobs"
+            return "bjobs -a"
     
     def getRunCmdRegex(self):
         """ Get compiled regular expression for parsing run command output
@@ -861,7 +861,7 @@ class CalibrationRunnerLSF(CalibrationRunnerQueue):
         bsub_cmd += " -o " + job.output_path + " " + job.cmd_raw
         self.logger.debug("Running bsub: %s" % bsub_cmd)
         process = Popen(bsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
-                        cwd=self.__rhessys_base, bufsize=1)
+                        cwd=self.run_path, bufsize=1)
          
         (process_stdout, process_stderr) = process.communicate()    
          
