@@ -1401,17 +1401,17 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
 
         
-        run_cmd = run_status_cmd = None
-        if args.parallel_mode == PARALLEL_MODE_LSF:
-            # Check for simulator_path, setup job commands accordingly
-            if args.simulator_path:
-                run_cmd = RHESSysCalibrator.getRunCmdLSFSim(args.simulator_path)
-                run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(args.simulator_path)
-            else:
-                run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=args.parallel_mode,
-                                                      mem_limit=args.mem_limit, 
-                                                      bsub_exclusive_mode=args.bsub_exclusive_mode)
-                run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=args.parallel_mode)
+#         run_cmd = run_status_cmd = None
+#         if args.parallel_mode == PARALLEL_MODE_LSF:
+#             # Check for simulator_path, setup job commands accordingly
+#             if args.simulator_path:
+#                 run_cmd = RHESSysCalibrator.getRunCmdLSFSim(args.simulator_path)
+#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(args.simulator_path)
+#             else:
+#                 run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=args.parallel_mode,
+#                                                       mem_limit=args.mem_limit, 
+#                                                       bsub_exclusive_mode=args.bsub_exclusive_mode)
+#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=args.parallel_mode)
 
         
         try:
@@ -1493,7 +1493,10 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
-                                                                       args.queue_name, run_cmd, run_status_cmd,
+                                                                       args.queue_name, 
+                                                                       mem_limit=args.mem_limit, 
+                                                                       bsub_exclusive_mode=args.bsub_exclusive_mode,
+                                                                       simulator_path=args.simulator_path,
                                                                        restart_runs=True)
             for run in runsToRestart:
                 # Dispatch to consumer
@@ -1514,7 +1517,10 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
-                                                                       args.queue_name, run_cmd, run_status_cmd)
+                                                                       args.queue_name, 
+                                                                       mem_limit=args.mem_limit, 
+                                                                       bsub_exclusive_mode=args.bsub_exclusive_mode,
+                                                                       simulator_path=args.simulator_path)
             
             # For each new run (from 1 to numNewRuns+1)
             iterations = numNewRuns + 1 # make sure we get all N
