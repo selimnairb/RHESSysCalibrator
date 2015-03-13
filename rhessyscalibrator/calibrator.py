@@ -183,85 +183,6 @@ class RHESSysCalibrator(object):
         
         return (runQueue, consumers)
     
-#    @classmethod
-#     def getRunCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE,
-#                   *args, **kwargs):
-#         """ Get job submission command given selected options
-#             
-#             @parallel_mode String, one of PARALLEL_MODES
-#             
-#             Valid keyword args:
-#             @param mem_limit Integer >=1, units GB. Default: 1
-#             @param bsub_exclusive_mode Boolean. Valid only for PARALLEL_MODE_LSF. Default: False
-#             @param rhessys_path String. Valid only for PARALLEL_MODE_PBS. Default: os.getcwd()
-#             
-#             @return String representing job submission command, None if
-#             parallel_mode does not support this operation.
-#             
-#             @raise Exception if unable to form command due to missing arguments
-#             
-#             @todo This logic should be moved to the concrete calibration runners.
-#         """
-#         mem_limit = int(kwargs.get('mem_limit', '1'))
-#         
-#         assert(mem_limit >= 1)
-#         
-#         run_cmd = None
-#         
-#         if parallel_mode == PARALLEL_MODE_LSF:
-#             bsub_exclusive_mode = bool(kwargs.get('bsub_exclusive_mode', False))
-#             if bsub_exclusive_mode:
-#                 run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
-#             else:
-#                 run_cmd = "bsub -n 1,1"
-#             run_cmd += " -M " + str(mem_limit)
-#             
-#         elif parallel_mode == PARALLEL_MODE_PBS:
-#             rhessys_path = os.path.abspath(kwargs.get('rhessys_path', os.getcwd()))
-#             run_cmd = "qsub -l nodes=1:ppn=1,vmem={mem_limit} -d {rhessys_path}".format(mem_limit=mem_limit,
-#                                                                                         rhessys_path=rhessys_path) # TODO verify
-#         return run_cmd
-    
-#    @classmethod
-#     def getRunStatusCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE):
-#         """ Get job status command
-#         
-#             @parallel_mode String, one of PARALLEL_MODES
-#     
-#             @return String representing job status command, None if
-#             parallel_mode does not support this operation.
-#             
-#             @todo This logic should be moved to the concrete calibration runners.
-#         """
-#         status_cmd = None
-#         
-#         if parallel_mode == PARALLEL_MODE_LSF:
-#             status_cmd = "bjobs"
-#         elif parallel_mode == PARALLEL_MODE_PBS:
-#             status_cmd = "qstat"
-#             
-#         return status_cmd
-    
-#     @classmethod
-#     def getRunCmdLSFSim(cls, simulator_path):
-#         """ Get LSF simulator job submission command
-#             
-#             @param simulator_path String representing path to LSF simulator
-# 
-#             @return String representing simulated job submission command
-#         """
-#         return os.path.join(simulator_path, "bsub.py")
-#     
-#     @classmethod
-#     def getRunStatusCmdLSFSim(cls, simulator_path):
-#         """ Get LSF simulator job status command
-#             
-#             @param simulator_path String representing path to LSF simulator
-# 
-#             @return String representing simulated job status command
-#         """
-#         return os.path.join(simulator_path, "bjobs.py")
-    
     @classmethod
     def getDBPath(cls, basedir):
         """ Returns the path to the DB file relative to basedir's parent
@@ -1150,17 +1071,6 @@ with the calibration session""")
         self.logger.debug("iterations: %d" % options.iterations)
         self.logger.debug("jobs: %d" % options.processes)
 
-#         run_cmd = run_status_cmd = None
-#         # If in LSF mode, check for simulator_path, setup job commands accordingly
-#         if options.parallel_mode == PARALLEL_MODE_LSF and options.simulator_path:
-#             run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
-#             run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
-#         else:
-#             run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
-#                                                   mem_limit=options.mem_limit, 
-#                                                   bsub_exclusive_mode=options.bsub_exclusive_mode)
-#             run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
-
         # Main events take place herein ...
         try:
             # Make sure we have everything we need to run calibrations        
@@ -1403,20 +1313,6 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         # Check for explicit routing and surface flowtable in cmd_proto, get dicts of
         # flowtables from basedir
         (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
-
-        
-#         run_cmd = run_status_cmd = None
-#         if args.parallel_mode == PARALLEL_MODE_LSF:
-#             # Check for simulator_path, setup job commands accordingly
-#             if args.simulator_path:
-#                 run_cmd = RHESSysCalibrator.getRunCmdLSFSim(args.simulator_path)
-#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(args.simulator_path)
-#             else:
-#                 run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=args.parallel_mode,
-#                                                       mem_limit=args.mem_limit, 
-#                                                       bsub_exclusive_mode=args.bsub_exclusive_mode)
-#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=args.parallel_mode)
-
         
         try:
             calibratorDB = \
