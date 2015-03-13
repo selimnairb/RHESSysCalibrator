@@ -113,8 +113,11 @@ class RHESSysCalibrator(object):
     @classmethod
     def initializeCalibrationRunnerConsumers(cls, basedir, logger, 
                                              session_id, parallel_mode, num_processes, polling_delay, 
-                                             queue_name=None, run_cmd=None, run_status_cmd=None,
-                                             restart_runs=False):
+                                             queue_name=None, 
+                                             mem_limit=None,
+                                             bsub_exclusive_mode=None,
+                                             restart_runs=False,
+                                             run_cmd=None, run_status_cmd=None,):
         """ Initialize a set of one or more CalibrationRunner objects
             to be used for executing calibration runs.
         
@@ -159,8 +162,8 @@ class RHESSysCalibrator(object):
                                                 RHESSysCalibrator.getDBPath(basedir),
                                                 queue_name,
                                                 polling_delay,
-                                                run_cmd,
-                                                run_status_cmd,
+                                                mem_limit,
+                                                RHESSysCalibrator.getRhessysPath(basedir),
                                                 logger,
                                                 restart_runs)
             elif PARALLEL_MODE_PROCESS == parallel_mode:
@@ -344,11 +347,10 @@ class RHESSysCalibrator(object):
             @param surface True if surface flowtable template variable is to be generated
             @return String representing the prototype command
         """
-        #cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2 -vgsen $vgsen1 $vgsen2 $vgsen3 -svalt $svalt1 $svalt2"""
         if surface:
-            cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable $surface_flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+            cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable $surface_flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
         else:
-            cmd_proto = """$rhessys -st 2003 10 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+            cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
         
         return cmd_proto
 
@@ -1218,7 +1220,9 @@ with the calibration session""")
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, options.parallel_mode, options.processes, options.polling_delay,
-                                                                       options.queue_name, run_cmd, run_status_cmd)
+                                                                       options.queue_name, 
+                                                                       mem_limit=options.mem_limit, 
+                                                                       bsub_exclusive_mode=options.bsub_exclusive_mode)
 
             # Dispatch runs to consumer
             # For each iteration (from 1 to options.iterations+1)
