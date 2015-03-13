@@ -143,32 +143,33 @@ class RHESSysCalibrator(object):
                 consumer = CalibrationRunnerQueueLSF(basedir,
                                                      session_id,
                                                      runQueue,
-                                                     num_processes,
                                                      RHESSysCalibrator.getDBPath(basedir),
+                                                     RHESSysCalibrator.getRhessysPath(basedir),
+                                                     logger,
+                                                     restart_runs,
                                                      queue_name,
                                                      polling_delay,
-                                                     run_cmd,
-                                                     run_status_cmd,
-                                                     logger,
-                                                     restart_runs)
+                                                     mem_limit,
+                                                     num_processes)
             elif PARALLEL_MODE_PBS == parallel_mode:
                 assert(queue_name is not None)
                 consumer = CalibrationRunnerPBS(basedir,
                                                 session_id,
                                                 runQueue,
-                                                num_processes,
                                                 RHESSysCalibrator.getDBPath(basedir),
+                                                RHESSysCalibrator.getRhessysPath(basedir),
+                                                logger,
+                                                restart_runs,
                                                 queue_name,
                                                 polling_delay,
                                                 mem_limit,
-                                                RHESSysCalibrator.getRhessysPath(basedir),
-                                                logger,
-                                                restart_runs)
+                                                num_processes)
             elif PARALLEL_MODE_PROCESS == parallel_mode:
                 consumer = CalibrationRunnerSubprocess(basedir,
                                                        session_id,
                                                        runQueue,
                                                        RHESSysCalibrator.getDBPath(basedir),
+                                                       RHESSysCalibrator.getRhessysPath(basedir),
                                                        logger,
                                                        restart_runs)
             else:
