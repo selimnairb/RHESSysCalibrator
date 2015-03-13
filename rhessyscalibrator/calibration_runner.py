@@ -508,8 +508,11 @@ class CalibrationRunnerQueueLSF(CalibrationRunnerLSF):
                 # Kludge to make sure we call self._queue.task_done() enough
                 time.sleep(self.EXIT_SLEEP_SECS)
                 while self.numActiveJobs > 0:
-                    self._queue.task_done()
-                    self.numActiveJobs -= 1
+                    try:
+                        self._queue.task_done()
+                        self.numActiveJobs -= 1
+                    except ValueError:
+                        break
                 break
             
 class CalibrationRunnerPBS(CalibrationRunner):
@@ -568,7 +571,7 @@ class CalibrationRunnerPBS(CalibrationRunner):
         self.qstatCmd = run_status_cmd
         self.qsubRegex = re.compile("^([0-9]+\.\S+)$")
         #self.__bsubErrRegex = re.compile("^User <\w+>: Pending job threshold reached. Retrying in 60 seconds...")
-        self.qstatRegex = re.compile("^([0-9]+\.\S+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s\S+$")
+        self.qstatRegex = re.compile("^([0-9]+\.\S+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s+\S+\s+$")
 
         self.rhessys_base = os.path.join(self.basedir, "rhessys")
         
@@ -684,7 +687,7 @@ class CalibrationRunnerPBS(CalibrationRunner):
         (process_stdout, process_stderr) = process.communicate()
         # Read output, foreach job, update status in DB
         for line in string.split(process_stdout, '\n'):
-            self.logger.debug(line)
+            self.logger.debug('|' + line + '|')
             match = self.qstatRegex.match(line)
             if None == match:
                 # Don't choke on header or blank lines of qstat output.
@@ -773,6 +776,9 @@ class CalibrationRunnerPBS(CalibrationRunner):
                 # Kludge to make sure we call self._queue.task_done() enough
                 time.sleep(self.EXIT_SLEEP_SECS)
                 while self.numActiveJobs > 0:
-                    self._queue.task_done()
-                    self.numActiveJobs -= 1
+                    try:
+                        self._queue.task_done()
+                        self.numActiveJobs -= 1
+                    except ValueError:
+                        break
                 break
