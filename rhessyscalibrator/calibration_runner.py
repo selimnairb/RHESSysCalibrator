@@ -298,6 +298,10 @@ class CalibrationRunnerQueue(CalibrationRunner):
                  db_path, run_path, logger, restart_runs,
                  submit_queue, polling_delay, mem_limit, max_active_jobs):
         """ 
+            Concrete classes must use getRunCmd() and getRunStatusCmd() to 
+            initialize self.run_cmd and self.run_status_cmd before the run() method
+            can be called.
+        
             @param basedir String representing the basedir of the calibration session
             @param session_id Integer representing the session ID of current calibration session
             @param queue Queue that jobs will be read from
@@ -323,6 +327,9 @@ class CalibrationRunnerQueue(CalibrationRunner):
         self.mem_limit = mem_limit
         self.max_active_jobs = max_active_jobs
         
+        self.run_cmd = None
+        self.run_status_cmd = None
+        
     def pollJobsStatus(self):
         """ Check status of jobs submitted.  Will update status
             for each job (run) in the DB.
@@ -337,7 +344,7 @@ class CalibrationRunnerQueue(CalibrationRunner):
         numRunningJobs = 0
         numRetiredJobs = 0
         
-        statusCmd = self.getRunStatusCmd()
+        statusCmd = self.run_status_cmd
         statusRegex = self.getRunStatusCmdRegex()
         
         # Call status command
@@ -392,6 +399,8 @@ class CalibrationRunnerQueue(CalibrationRunner):
         """ Method to be run in a consumer thread/process to launch a run
             submitted by procuder thread/process
         """
+        assert(self.run_cmd is not None)
+        assert(self.run_status_cmd is not None)
         # Wait for a bit for jobs to be submitted to the queue
         time.sleep(self.INIT_SLEEP_SECS)
         while True:
@@ -753,7 +762,148 @@ class CalibrationRunnerLSF(CalibrationRunnerQueue):
     """ CalibrationRunner for use with LSF job management system.
 
     """            
-    pass
+    def getRunCmd(self, *args, **kwargs):
+        """ Get job submission command given selected options
+         
+            Valid keyword args:
+            @param simulator_path String representing path to LSF simulator.  Default: None. If specified
+                simulator will be used instead of real LSF commands.
+            @param mem_limit Integer representing memory limit for jobs. Unit: GB, Default: 4.
+            @param bsub_exclusive_mode Boolean specifying that bsub_exclusive_mode. Default: False
+            should be used
+         
+            @return String representing job submission command
+        """
+        simulator_path = kwargs.get('simulator_path', None)
+        
+        run_cmd = None
+        if simulator_path:
+            run_cmd = os.path.join(simulator_path, "bsub.py")
+        else:
+            mem_limit = int(kwargs.get('mem_limit', '4'))
+            bsub_exclusive_mode = bool(kwargs.get('bsub_exclusive_mode', False))
+            
+            run_cmd = "bsub -n 1,1"
+            if bsub_exclusive_mode:
+                run_cmd += """ -R "span[hosts=1]" -x"""
+            run_cmd += " -M " + str(mem_limit)
+        
+        return run_cmd
+    
+    def getRunStatusCmd(self, *args, **kwargs):
+        """ Get job status command
+        
+            Valid keyword args:
+            @param simulator_path String representing path to LSF simulator.  Default: None. If specified
+                simulator will be used instead of real LSF commands.
+        
+            @return String representing job status command
+        """
+        simulator_path = kwargs.get('simulator_path', None)
+        
+        if simulator_path:
+            return os.path.join(simulator_path, "bjobs.py") 
+        else:
+            return "bjobs"
+    
+    def getRunCmdRegex(self):
+        """ Get compiled regular expression for parsing run command output
+        """
+        return re.compile("^Job\s<([0-9]+)>\s.+$")
+    
+    def getRunStatusCmdRegex(self):
+        """ Get compiled regular expression for parsing run status 
+            command output.  Concrete classes must return a regex
+            that matches the job ID in group 1 and the job status 
+            in group 2.
+        """
+        return re.compile("^([0-9]+)\s+\w+\s+(\w+)\s+.+$")
+    
+    def mapStatusCode(self, status_code):
+        """ Map between status codes of the underlying queue system
+            and calibrator status codes
+            
+            @param status_code String representing status code of underlying 
+                queue system
+            
+            @return String representing calibrator status code 
+        """
+        # Calibrator uses LSF status codes natively, so do nothing here.
+        return status_code
+
+    def __init__(self, basedir, session_id, queue, 
+                 db_path, run_path, logger, restart_runs,
+                 submit_queue, polling_delay, mem_limit, max_active_jobs,
+                 bsub_exclusive_mode=False, simulator_path=None):
+        super(CalibrationRunnerLSF, self).__init__(basedir, session_id, queue, 
+                 db_path, run_path, logger, restart_runs,
+                 submit_queue, polling_delay, mem_limit, max_active_jobs)
+        
+        self.bsub_exclusive_mode = bsub_exclusive_mode
+        self.simulator_path = simulator_path
+        
+        self.run_cmd = self.getRunCmd(simulator_path=self.simulator_path,
+                                      bsub_exclusive_mode=self.bsub_exclusive_mode,
+                                      mem_limit=self.mem_limit)
+        self.run_status_cmd = self.getRunStatusCmd(simulator_path=self.simulator_path)
+        
+    def submitJob(self, job):
+        """ Submit a job using LSF.  Will add job to DB.
+         
+            @param job model_runner_db.ModelRun representing the job to run
+             
+            @raise Exception if bsub output is not what was expected
+        """
+        # Call bsub
+        bsub_cmd = self.run_cmd
+        if None != self.submit_queue:
+            bsub_cmd += " -q " + self.submit_queue
+        bsub_cmd += " -o " + job.output_path + " " + job.cmd_raw
+        self.logger.debug("Running bsub: %s" % bsub_cmd)
+        process = Popen(bsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
+                        cwd=self.__rhessys_base, bufsize=1)
+         
+        (process_stdout, process_stderr) = process.communicate()    
+         
+        # Read job id from bsub outupt (e.g. "Job <ID> is submitted ...")
+        self.logger.critical("stdout from bsub: %s" % process_stdout)
+        self.logger.critical("stderr from bsub: %s" % process_stderr)
+        match = self.getRunCmdRegex().match(process_stdout)
+        if None == match:
+            raise Exception("Error while reading output from bsub:\ncmd: %s\n\n|%s|\n%s,\npattern: |%s|" %
+                            (bsub_cmd, process_stdout, process_stderr, 
+                             self.getRunCmdRegex().pattern))
+        self.numActiveJobs += 1
+        job.job_id = match.group(1)
+         
+        if self.restart_runs:
+            # Ensure run to restart exists
+            run = self.db.getRun(job.id)
+            if run is None:
+                raise Exception("Run %d does not exist and cannot be restarted" % (job.id,) )
+            # Update job_id
+            self.db.updateRunJobId(job.id, job.job_id)
+        else:
+            # New run, store in ModelRunnerDB (insertRun)
+            insertedRunID = self.db.insertRun(job.session_id,
+                                              job.worldfile,
+                                              job.param_s1, job.param_s2,
+                                              job.param_s3, job.param_sv1,
+                                              job.param_sv2, job.param_gw1,
+                                              job.param_gw2, job.param_vgsen1,
+                                              job.param_vgsen2, job.param_vgsen3,
+                                              job.param_svalt1, job.param_svalt2,
+                                              job.cmd_raw,
+                                              job.output_path,
+                                              job.job_id,
+                                              job.fitness_period,
+                                              job.nse, job.nse_log,
+                                              job.pbias, job.rsr,
+                                              job.user1, job.user2, job.user3)
+            job.id = insertedRunID
+             
+        self.logger.critical("Run %s submitted as job %s" % 
+                             (job.id, job.job_id))
             
 class CalibrationRunnerPBS(CalibrationRunnerQueue):
     """ CalibrationRunner for use with PBS/TORQUE job management system.
@@ -810,6 +960,9 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
                  db_path, run_path, logger, restart_runs,
                  submit_queue, polling_delay, mem_limit, max_active_jobs)
         
+        self.run_cmd = self.getRunCmd()
+        self.run_status_cmd = self.getRunStatusCmd()
+        
     def submitJob(self, job):
         """ Submit a job to the underlying queue system.  
         
@@ -840,7 +993,7 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
                                                    job.output_path, 'pbs.out'))
         stderr_file = os.path.abspath(os.path.join(self.run_path,
                                                    job.output_path, 'pbs.err'))
-        qsub_cmd = self.getRunCmd()
+        qsub_cmd = self.run_cmd
         if None != self.submit_queue:
             qsub_cmd += ' -q ' + self.submit_queue
         qsub_cmd += ' -o ' + stdout_file + ' -e ' + stderr_file

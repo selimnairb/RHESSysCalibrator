@@ -115,9 +115,9 @@ class RHESSysCalibrator(object):
                                              session_id, parallel_mode, num_processes, polling_delay, 
                                              queue_name=None, 
                                              mem_limit=None,
-                                             bsub_exclusive_mode=None,
                                              restart_runs=False,
-                                             run_cmd=None, run_status_cmd=None,):
+                                             bsub_exclusive_mode=False,
+                                             simulator_path=None):
         """ Initialize a set of one or more CalibrationRunner objects
             to be used for executing calibration runs.
         
@@ -138,19 +138,19 @@ class RHESSysCalibrator(object):
             # Create CalibrationRunner object (consumer)
             if PARALLEL_MODE_LSF == parallel_mode:
                 assert(queue_name is not None)
-                assert(run_cmd is not None)
-                assert(run_status_cmd is not None)
-                consumer = CalibrationRunnerQueueLSF(basedir,
-                                                     session_id,
-                                                     runQueue,
-                                                     RHESSysCalibrator.getDBPath(basedir),
-                                                     RHESSysCalibrator.getRhessysPath(basedir),
-                                                     logger,
-                                                     restart_runs,
-                                                     queue_name,
-                                                     polling_delay,
-                                                     mem_limit,
-                                                     num_processes)
+                consumer = CalibrationRunnerLSF(basedir,
+                                                session_id,
+                                                runQueue,
+                                                RHESSysCalibrator.getDBPath(basedir),
+                                                RHESSysCalibrator.getRhessysPath(basedir),
+                                                logger,
+                                                restart_runs,
+                                                queue_name,
+                                                polling_delay,
+                                                mem_limit,
+                                                num_processes,
+                                                bsub_exclusive_mode,
+                                                simulator_path)
             elif PARALLEL_MODE_PBS == parallel_mode:
                 assert(queue_name is not None)
                 consumer = CalibrationRunnerPBS(basedir,
@@ -184,84 +184,84 @@ class RHESSysCalibrator(object):
         
         return (runQueue, consumers)
     
-    @classmethod
-    def getRunCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE,
-                  *args, **kwargs):
-        """ Get job submission command given selected options
-            
-            @parallel_mode String, one of PARALLEL_MODES
-            
-            Valid keyword args:
-            @param mem_limit Integer >=1, units GB. Default: 1
-            @param bsub_exclusive_mode Boolean. Valid only for PARALLEL_MODE_LSF. Default: False
-            @param rhessys_path String. Valid only for PARALLEL_MODE_PBS. Default: os.getcwd()
-            
-            @return String representing job submission command, None if
-            parallel_mode does not support this operation.
-            
-            @raise Exception if unable to form command due to missing arguments
-            
-            @todo This logic should be moved to the concrete calibration runners.
-        """
-        mem_limit = int(kwargs.get('mem_limit', '1'))
-        
-        assert(mem_limit >= 1)
-        
-        run_cmd = None
-        
-        if parallel_mode == PARALLEL_MODE_LSF:
-            bsub_exclusive_mode = bool(kwargs.get('bsub_exclusive_mode', False))
-            if bsub_exclusive_mode:
-                run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
-            else:
-                run_cmd = "bsub -n 1,1"
-            run_cmd += " -M " + str(mem_limit)
-            
-        elif parallel_mode == PARALLEL_MODE_PBS:
-            rhessys_path = os.path.abspath(kwargs.get('rhessys_path', os.getcwd()))
-            run_cmd = "qsub -l nodes=1:ppn=1,vmem={mem_limit} -d {rhessys_path}".format(mem_limit=mem_limit,
-                                                                                        rhessys_path=rhessys_path) # TODO verify
-        return run_cmd
+#    @classmethod
+#     def getRunCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE,
+#                   *args, **kwargs):
+#         """ Get job submission command given selected options
+#             
+#             @parallel_mode String, one of PARALLEL_MODES
+#             
+#             Valid keyword args:
+#             @param mem_limit Integer >=1, units GB. Default: 1
+#             @param bsub_exclusive_mode Boolean. Valid only for PARALLEL_MODE_LSF. Default: False
+#             @param rhessys_path String. Valid only for PARALLEL_MODE_PBS. Default: os.getcwd()
+#             
+#             @return String representing job submission command, None if
+#             parallel_mode does not support this operation.
+#             
+#             @raise Exception if unable to form command due to missing arguments
+#             
+#             @todo This logic should be moved to the concrete calibration runners.
+#         """
+#         mem_limit = int(kwargs.get('mem_limit', '1'))
+#         
+#         assert(mem_limit >= 1)
+#         
+#         run_cmd = None
+#         
+#         if parallel_mode == PARALLEL_MODE_LSF:
+#             bsub_exclusive_mode = bool(kwargs.get('bsub_exclusive_mode', False))
+#             if bsub_exclusive_mode:
+#                 run_cmd = """bsub -n 1,1 -R "span[hosts=1]" -x"""
+#             else:
+#                 run_cmd = "bsub -n 1,1"
+#             run_cmd += " -M " + str(mem_limit)
+#             
+#         elif parallel_mode == PARALLEL_MODE_PBS:
+#             rhessys_path = os.path.abspath(kwargs.get('rhessys_path', os.getcwd()))
+#             run_cmd = "qsub -l nodes=1:ppn=1,vmem={mem_limit} -d {rhessys_path}".format(mem_limit=mem_limit,
+#                                                                                         rhessys_path=rhessys_path) # TODO verify
+#         return run_cmd
     
-    @classmethod
-    def getRunStatusCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE):
-        """ Get job status command
-        
-            @parallel_mode String, one of PARALLEL_MODES
+#    @classmethod
+#     def getRunStatusCmd(cls, parallel_mode=DEFAULT_PARALLEL_MODE):
+#         """ Get job status command
+#         
+#             @parallel_mode String, one of PARALLEL_MODES
+#     
+#             @return String representing job status command, None if
+#             parallel_mode does not support this operation.
+#             
+#             @todo This logic should be moved to the concrete calibration runners.
+#         """
+#         status_cmd = None
+#         
+#         if parallel_mode == PARALLEL_MODE_LSF:
+#             status_cmd = "bjobs"
+#         elif parallel_mode == PARALLEL_MODE_PBS:
+#             status_cmd = "qstat"
+#             
+#         return status_cmd
     
-            @return String representing job status command, None if
-            parallel_mode does not support this operation.
-            
-            @todo This logic should be moved to the concrete calibration runners.
-        """
-        status_cmd = None
-        
-        if parallel_mode == PARALLEL_MODE_LSF:
-            status_cmd = "bjobs"
-        elif parallel_mode == PARALLEL_MODE_PBS:
-            status_cmd = "qstat"
-            
-        return status_cmd
-    
-    @classmethod
-    def getRunCmdLSFSim(cls, simulator_path):
-        """ Get LSF simulator job submission command
-            
-            @param simulator_path String representing path to LSF simulator
-
-            @return String representing simulated job submission command
-        """
-        return os.path.join(simulator_path, "bsub.py")
-    
-    @classmethod
-    def getRunStatusCmdLSFSim(cls, simulator_path):
-        """ Get LSF simulator job status command
-            
-            @param simulator_path String representing path to LSF simulator
-
-            @return String representing simulated job status command
-        """
-        return os.path.join(simulator_path, "bjobs.py")
+#     @classmethod
+#     def getRunCmdLSFSim(cls, simulator_path):
+#         """ Get LSF simulator job submission command
+#             
+#             @param simulator_path String representing path to LSF simulator
+# 
+#             @return String representing simulated job submission command
+#         """
+#         return os.path.join(simulator_path, "bsub.py")
+#     
+#     @classmethod
+#     def getRunStatusCmdLSFSim(cls, simulator_path):
+#         """ Get LSF simulator job status command
+#             
+#             @param simulator_path String representing path to LSF simulator
+# 
+#             @return String representing simulated job status command
+#         """
+#         return os.path.join(simulator_path, "bjobs.py")
     
     @classmethod
     def getDBPath(cls, basedir):
@@ -1130,16 +1130,16 @@ with the calibration session""")
                 (PARALLEL_MODE_PROCESS == options.parallel_mode))
 
         if not options.queue_name:
-            options.queue_name = DEFAULT_QUEUE_NAME
+            parser.error("""Please specify a queue name that is valid for your system.""")
         
         if not options.polling_delay:
             options.polling_delay = 1
             
         if not options.use_horizontal_m_and_K_for_vertical:
-            options.use_horizontal_m_and_K_for_vertical = 0;
+            options.use_horizontal_m_and_K_for_vertical = False;
 
         if not options.bsub_exclusive_mode:
-            options.bsub_exclusive_mode = 0;
+            options.bsub_exclusive_mode = False;
 
         self.logger.critical("parallel mode: %s" % options.parallel_mode)
         self.logger.debug("basedir: %s" % self.basedir)
@@ -1150,16 +1150,16 @@ with the calibration session""")
         self.logger.debug("iterations: %d" % options.iterations)
         self.logger.debug("jobs: %d" % options.processes)
 
-        run_cmd = run_status_cmd = None
-        # If in LSF mode, check for simulator_path, setup job commands accordingly
-        if options.parallel_mode == PARALLEL_MODE_LSF and options.simulator_path:
-            run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
-        else:
-            run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
-                                                  mem_limit=options.mem_limit, 
-                                                  bsub_exclusive_mode=options.bsub_exclusive_mode)
-            run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
+#         run_cmd = run_status_cmd = None
+#         # If in LSF mode, check for simulator_path, setup job commands accordingly
+#         if options.parallel_mode == PARALLEL_MODE_LSF and options.simulator_path:
+#             run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
+#             run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
+#         else:
+#             run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
+#                                                   mem_limit=options.mem_limit, 
+#                                                   bsub_exclusive_mode=options.bsub_exclusive_mode)
+#             run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
 
         # Main events take place herein ...
         try:
@@ -1221,7 +1221,8 @@ with the calibration session""")
                                                                        self.session.id, options.parallel_mode, options.processes, options.polling_delay,
                                                                        options.queue_name, 
                                                                        mem_limit=options.mem_limit, 
-                                                                       bsub_exclusive_mode=options.bsub_exclusive_mode)
+                                                                       bsub_exclusive_mode=options.bsub_exclusive_mode,
+                                                                       simulator_path=options.simulator_path)
 
             # Dispatch runs to consumer
             # For each iteration (from 1 to options.iterations+1)
