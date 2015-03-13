@@ -96,7 +96,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
 
         parser.add_argument("-q", "--queue", action="store",
                           dest="queue_name", required=False,
-                          help="Set queue name to pass to underlying queue manager.  " +
+                          help="Set queue name to submit jobs to using the underlying queue manager.  " +
                                "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
 
         parser.add_argument("--parallel_mode", action="store", 
