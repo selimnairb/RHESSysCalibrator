@@ -8,7 +8,7 @@ management.
 This software is provided free of charge under the New BSD License. Please see
 the following license information:
 
-Copyright (c) 2013, University of North Carolina at Chapel Hill
+Copyright (c) 2013-2015, University of North Carolina at Chapel Hill
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -175,20 +175,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             
             self.logger.debug("behavioral cmd.proto: %s" % (cmdProtoPath,) )
         
-        
         notes = "Behavioral run, using filter: %s" % (options.behavioral_filter,)
-        
-#         run_cmd = run_stats_cmd = None
-#         if options.parallel_mode == calibrator.PARALLEL_MODE_LSF:
-#             # Check for simulator_path, setup job commands accordingly
-#             if options.simulator_path:
-#                 run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
-#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
-#             else:
-#                 run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
-#                                                       mem_limit=options.mem_limit, 
-#                                                       bsub_exclusive_mode=options.bsub_exclusive_mode)
-#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
 
         try:
             dbPath = RHESSysCalibrator.getDBPath(self.basedir)
