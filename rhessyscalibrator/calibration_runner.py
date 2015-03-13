@@ -34,6 +34,7 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @author Brian Miles <brian_miles@unc.edu>
 """
 import os
+import stat
 from subprocess import *
 import thread # _thread in Python 3
 import Queue  # queue in Python 3
@@ -233,7 +234,7 @@ class CalibrationRunnerQueue(CalibrationRunner):
         """
         raise NotImplementedError()
     
-    def getRunStatusCmd(self, *args, **args):
+    def getRunStatusCmd(self, *args, **kwargs):
         """ Get job status command
         
             @return String representing job status command
@@ -764,10 +765,9 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
          
             @return String representing job submission command
         """
-        return "qsub -l nodes=1:ppn=1,vmem={mem_limit} -d {run_path}".format(mem_limit=self.mem_limit,
-                                                                             run_path=self.run_path)
+        return "qsub -d {run_path}".format(run_path=self.run_path)
     
-    def getRunStatusCmd(self, *args, **args):
+    def getRunStatusCmd(self, *args, **kwargs):
         """ Get job status command
         
             @return String representing job status command
@@ -777,7 +777,7 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
     def getRunCmdRegex(self):
         """ Get compiled regular expression for parsing run command output
         """
-        re.compile("^([0-9]+\.\S+)$")
+        return re.compile("^([0-9]+\.\S+)$")
     
     def getRunStatusCmdRegex(self):
         """ Get compiled regular expression for parsing run status 
@@ -819,7 +819,10 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
             @param run model_runner_db.ModelRun representing the run that has
                                                           completed
         """
-        self._queue.task_done()
+        try:
+            self._queue.task_done()
+        except ValueError:
+            return
         
     def submitJob(self, job):
         """ Submit a job to the underlying queue system.  
@@ -836,23 +839,29 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
                                                        job.output_path, 'pbs.script'))
         script = open(script_filename, 'w')
         script.write('#!/bin/bash\n\n')
+        script.write('#PBS -l nodes=1:ppn=1\n')
+        script.write("#PBS -l vmem={mem_limit}gb\n".format(mem_limit=self.mem_limit))
+        #script.write('#PBS -l walltime=24:00:00\n') # Try to get by without specifying this
+        script.write('\n')
         script.write(job.cmd_raw)
         script.write('\n')
         script.close()
+        os.chmod(script_filename, 
+                 stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         
         # Build qsub command line
         stdout_file = os.path.abspath(os.path.join(self.run_path, 
                                                    job.output_path, 'pbs.out'))
         stderr_file = os.path.abspath(os.path.join(self.run_path,
                                                    job.output_path, 'pbs.err'))
-        qsub_cmd = self.runCmd
+        qsub_cmd = self.getRunCmd()
         if None != self.submit_queue:
             qsub_cmd += ' -q ' + self.submit_queue
         qsub_cmd += ' -o ' + stdout_file + ' -e ' + stderr_file
         qsub_cmd += ' ' + script_filename
         
         # Run qsub
-        self.logger.debug("Running qsub: %s" % qsub_cmd)
+        self.logger.debug("Running qsub: %s from path: %s" % (qsub_cmd, self.run_path))
         process = Popen(qsub_cmd, shell=True, stdout=PIPE, stderr=PIPE,
                         cwd=self.run_path, bufsize=1)
         

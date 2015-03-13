@@ -153,8 +153,6 @@ class RHESSysCalibrator(object):
                                                      restart_runs)
             elif PARALLEL_MODE_PBS == parallel_mode:
                 assert(queue_name is not None)
-                assert(run_cmd is not None)
-                assert(run_status_cmd is not None)
                 consumer = CalibrationRunnerPBS(basedir,
                                                 session_id,
                                                 runQueue,
