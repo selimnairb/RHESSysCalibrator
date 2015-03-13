@@ -96,8 +96,8 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
 
         parser.add_argument("-q", "--queue", action="store",
                           dest="queue_name", required=False,
-                          default=calibrator.DEFAULT_QUEUE_NAME,
-                          help="Set queue name to pass to LSF job submission command.")
+                          help="Set queue name to pass to underlying queue manager.  " +
+                               "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
 
         parser.add_argument("--parallel_mode", action="store", 
                           dest="parallel_mode", required=False,
@@ -131,6 +131,9 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             self._initLogger(logging.CRITICAL)
         else:
             self._initLogger(logging.NOTSET)
+         
+        if options.parallel_mode != calibrator.PARALLEL_MODE_PROCESS and not options.queue_name:
+            sys.exit("""Please specify a queue name that is valid for your system.""")
             
         if not os.path.isdir(options.basedir) or not os.access(options.basedir, os.R_OK):
             sys.exit("Unable to read project directory %s" % (options.basedir,) )
@@ -175,17 +178,17 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
         
         notes = "Behavioral run, using filter: %s" % (options.behavioral_filter,)
         
-        run_cmd = run_stats_cmd = None
-        if options.parallel_mode == calibrator.PARALLEL_MODE_LSF:
-            # Check for simulator_path, setup job commands accordingly
-            if options.simulator_path:
-                run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
-                run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
-            else:
-                run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
-                                                      mem_limit=options.mem_limit, 
-                                                      bsub_exclusive_mode=options.bsub_exclusive_mode)
-                run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
+#         run_cmd = run_stats_cmd = None
+#         if options.parallel_mode == calibrator.PARALLEL_MODE_LSF:
+#             # Check for simulator_path, setup job commands accordingly
+#             if options.simulator_path:
+#                 run_cmd = RHESSysCalibrator.getRunCmdLSFSim(options.simulator_path)
+#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmdLSFSim(options.simulator_path)
+#             else:
+#                 run_cmd = RHESSysCalibrator.getRunCmd(parallel_mode=options.parallel_mode,
+#                                                       mem_limit=options.mem_limit, 
+#                                                       bsub_exclusive_mode=options.bsub_exclusive_mode)
+#                 run_status_cmd = RHESSysCalibrator.getRunStatusCmd(parallel_mode=options.parallel_mode)
 
         try:
             dbPath = RHESSysCalibrator.getDBPath(self.basedir)
@@ -269,7 +272,10 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             (runQueue, consumers) = \
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, options.parallel_mode, options.processes, options.polling_delay,
-                                                                       options.queue_name, run_cmd, run_status_cmd)
+                                                                       options.queue_name, 
+                                                                       mem_limit=options.mem_limit, 
+                                                                       bsub_exclusive_mode=options.bsub_exclusive_mode,
+                                                                       simulator_path=options.simulator_path)
             
             # Dispatch runs to consumer
             # Note: we're iterating over behavioral runs to get their paramter values

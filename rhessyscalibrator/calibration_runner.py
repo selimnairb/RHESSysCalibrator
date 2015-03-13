@@ -986,7 +986,7 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
         script.write('\n')
         script.close()
         os.chmod(script_filename, 
-                 stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                 stat.S_IWUSR | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         
         # Build qsub command line
         stdout_file = os.path.abspath(os.path.join(self.run_path, 

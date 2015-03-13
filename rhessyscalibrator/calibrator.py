@@ -61,7 +61,6 @@ from rhessyscalibrator.calibration_runner import *
 from rhessyscalibrator.calibration_parameters import *
 
 # Constants
-DEFAULT_QUEUE_NAME = 'day'
 PARALLEL_MODE_LSF = 'lsf'
 PARALLEL_MODE_PBS = 'pbs'
 PARALLEL_MODE_PROCESS = 'process'
@@ -1048,7 +1047,8 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("-q", "--queue", action="store",
                           type="string", dest="queue_name",
-                          help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
+                          help="[OPTIONAL] Set queue name to submit jobs to using the underlying queue manager.  " +
+                               "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
 
         parser.add_option("--parallel_mode", action="store", 
                           type="string", dest="parallel_mode",
@@ -1129,7 +1129,7 @@ with the calibration session""")
                 (PARALLEL_MODE_PBS == options.parallel_mode) or
                 (PARALLEL_MODE_PROCESS == options.parallel_mode))
 
-        if not options.queue_name:
+        if options.parallel_mode != PARALLEL_MODE_PROCESS and not options.queue_name:
             parser.error("""Please specify a queue name that is valid for your system.""")
         
         if not options.polling_delay:
@@ -1321,8 +1321,9 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                             dest="simulator_path",
                             help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
         parser.add_argument("-q", "--queue",
-                            dest="queue_name", default=DEFAULT_QUEUE_NAME,
-                            help="[OPTIONAL] set queue name to pass to LSF job submission command.  UNC's KillDevil supports the following for general usage: day, debug, hour, week, bigmem.  If queue option is not supplied the 'day' queue will be used.")
+                            dest="queue_name", required=False,
+                            help="[OPTIONAL] Set queue name to submit jobs to using the underlying queue manager.  " +
+                               "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
         parser.add_argument("--parallel_mode",
                             dest="parallel_mode", choices=PARALLEL_MODES, default=DEFAULT_PARALLEL_MODE,
                             help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], pbs, process")
@@ -1352,6 +1353,9 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             self._initLogger(logging.CRITICAL)
         else:
             self._initLogger(logging.INFO)
+        
+        if args.parallel_mode != PARALLEL_MODE_PROCESS and not args.queue_name:
+            sys.exit("""Please specify a queue name that is valid for your system.""")
         
         if not os.path.isdir(args.basedir) or not os.access(args.basedir, os.W_OK):
             sys.exit("Unable to write to basedir %s" % (args.basedir,) )
