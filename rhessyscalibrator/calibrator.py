@@ -965,11 +965,11 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("-s", "--simulator_path", action="store", 
                           type="string", dest="simulator_path",
-                          help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
+                          help="[ADVANCED; OPTIONAL] Set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
 
         parser.add_option("-q", "--queue", action="store",
                           type="string", dest="queue_name",
-                          help="[OPTIONAL] Set queue name to submit jobs to using the underlying queue manager.  " +
+                          help="[OPTIONAL] set queue name to submit jobs to using the underlying queue manager.  " +
                                "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
 
         parser.add_option("--parallel_mode", action="store", 
@@ -986,16 +986,16 @@ obs/                       Where you will store observed data to be compared to
         
         parser.add_option("--bsub_exclusive_mode", action="store_true",
                           dest="bsub_exclusive_mode",
-                          help="[ADVANCED; OPTIONAL] For LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
+                          help="[ADVANCED; OPTIONAL] for LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
 
         parser.add_option("--mem_limit", action="store",
                           type="int", dest="mem_limit",
                           default=4,
-                          help="[ADVANCED; OPTIONAL] For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
+                          help="[OPTIONAL] for non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
         
         parser.add_option("--wall_time", action="store",
                           type="int", dest="wall_time",
-                          help="[ADVANCED; OPTIONAL] For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
+                          help="[OPTIONAL] For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
 
         (options, args) = parser.parse_args()
 
@@ -1229,39 +1229,43 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         parser = argparse.ArgumentParser(description='Restart calibration run')
         parser.add_argument("-b", "--basedir", 
                             dest="basedir", required=True,
-                            help="[REQUIRED] base directory for the calibration session")
+                            help="The base directory for the calibration session")
         parser.add_argument("-s", "--session", type=int,
                             dest="session_id", required=True,
-                            help="[REQUIRED] the ID of the session for which model fitness statistics should be calculated")
+                            help="The ID of the session for which model fitness statistics should be calculated")
         parser.add_argument("-l", "--loglevel",
                             dest="loglevel", default="OFF", choices=['OFF', 'DEBUG', 'CRITICAL'],
-                            help="[OPTIONAL] set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
+                            help="Set logging level, one of: OFF [default], DEBUG, CRITICAL (case sensitive)")
         parser.add_argument("-j", "--jobs", type=int,
                             dest="processes",
-                            help="[REQUIRED] the number of simultaneous jobs (runs) to run at any given time in the calibration session (e.g. --jobs=32).  Maximum value is %d" % MAX_PROCESSORS) 
+                            help="The number of simultaneous jobs (runs) to run at any given time in the calibration session (e.g. --jobs=32).  Maximum value is %d" % MAX_PROCESSORS) 
         parser.add_argument("--simulator_path",
                             dest="simulator_path",
-                            help="[OPTIONAL] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
+                            help="[ADVANCED] set path for LSF simulator.  When supplied, jobs will be submitted to the simulator, not via actual LSF commands.  Must be the absolute path (e.g. /Users/joeuser/rhessys_calibrator/lsf-sim)")
         parser.add_argument("-q", "--queue",
                             dest="queue_name", required=False,
-                            help="[OPTIONAL] Set queue name to submit jobs to using the underlying queue manager.  " +
+                            help="Set queue name to submit jobs to using the underlying queue manager.  " +
                                "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
         parser.add_argument("--parallel_mode",
                             dest="parallel_mode", choices=PARALLEL_MODES, default=DEFAULT_PARALLEL_MODE,
-                            help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], pbs, process")
+                            help="Set method to use for running jobs in parallel, one of: lsf [default], pbs, process")
         parser.add_argument("--polling_delay", default=1,
                             type=int, dest="polling_delay",
-                            help="[ADVANCED; OPTIONAL] set multiplier for how long to wait in between successive pollings of job status.  Default polling delay is 60 seconds, thus a multiplier of 5 will result in a delay of 5 minutes instead of 1 minute.")
+                            help="[ADVANCED] set multiplier for how long to wait in between successive pollings of job status.  Default polling delay is 60 seconds, thus a multiplier of 5 will result in a delay of 5 minutes instead of 1 minute.")
         parser.add_argument("--use_horizontal_m_and_K_for_vertical", action="store_true",
                             dest="use_horizontal_m_and_K_for_vertical",
-                            help="[ADVANCED; OPTIONAL] use The same m and K parameters for horizontal (i.e. -s) as well as vertical (i.e. -sv ) directions.  Defaults to false.")
+                            help="[ADVANCED] use The same m and K parameters for horizontal (i.e. -s) as well as vertical (i.e. -sv ) directions.  Defaults to false.")
         parser.add_argument("--bsub_exclusive_mode", action="store_true",
                             dest="bsub_exclusive_mode",
-                            help="[ADVANCED; OPTIONAL] For LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
+                            help="[ADVANCED] For LSF parallel mode: run bsub with arguments \"-n 1 -R 'span[hosts=1]' -x\" to ensure jobs only run exclusively (i.e. the only job on a node). This can be useful for models that use a lot of memory.")
         parser.add_argument("--mem_limit",
                             type=int, dest="mem_limit",
                             default=4,
-                            help="[ADVANCED; OPTIONAL] For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
+                            help="For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
+        parser.add_argument("--wall_time", action="store",
+                            type=int, dest="wall_time",
+                            help="For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
+
 
         args = parser.parse_args()
         
@@ -1278,6 +1282,12 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         
         if args.parallel_mode != PARALLEL_MODE_PROCESS and not args.queue_name:
             sys.exit("""Please specify a queue name that is valid for your system.""")
+    
+        wall_time = None
+        if args.parallel_mode == PARALLEL_MODE_PBS and args.wall_time:
+            if args.wall_time < 1 or args.wall_time > 168:
+                sys.exit("Wall time must be greater than 0 and less than 169 hours")
+            wall_time = args.wall_time
         
         if not os.path.isdir(args.basedir) or not os.access(args.basedir, os.W_OK):
             sys.exit("Unable to write to basedir %s" % (args.basedir,) )
@@ -1407,7 +1417,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
                                                                        args.queue_name, 
                                                                        mem_limit=args.mem_limit, 
-                                                                       #wall_time=wall_time,
+                                                                       wall_time=wall_time,
                                                                        bsub_exclusive_mode=args.bsub_exclusive_mode,
                                                                        simulator_path=args.simulator_path,
                                                                        restart_runs=True)
@@ -1432,7 +1442,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
                                                                        args.queue_name, 
                                                                        mem_limit=args.mem_limit,
-                                                                       #wall_time=wall_time,
+                                                                       wall_time=wall_time,
                                                                        bsub_exclusive_mode=args.bsub_exclusive_mode,
                                                                        simulator_path=args.simulator_path)
             
