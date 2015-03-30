@@ -152,7 +152,6 @@ class RHESSysCalibrator(object):
                                                 bsub_exclusive_mode,
                                                 simulator_path)
             elif PARALLEL_MODE_PBS == parallel_mode:
-                assert(queue_name is not None)
                 consumer = CalibrationRunnerPBS(basedir,
                                                 session_id,
                                                 runQueue,
