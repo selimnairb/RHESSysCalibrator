@@ -626,7 +626,7 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
     def getRunCmdRegex(self):
         """ Get compiled regular expression for parsing run command output
         """
-        return re.compile("^([0-9]+\.\S+)(?:\.\S+)*$")
+        return re.compile("^([0-9]+\.[0-9A-Za-z-]+).*$")
     
     def getRunStatusCmdRegex(self):
         """ Get compiled regular expression for parsing run status 
