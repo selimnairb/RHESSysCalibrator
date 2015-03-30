@@ -649,13 +649,16 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
 
     def __init__(self, basedir, session_id, queue, 
                  db_path, run_path, logger, restart_runs,
-                 submit_queue, polling_delay, mem_limit, max_active_jobs):
+                 submit_queue, polling_delay, mem_limit, max_active_jobs,
+                 wall_time):
         super(CalibrationRunnerPBS, self).__init__(basedir, session_id, queue, 
                  db_path, run_path, logger, restart_runs,
                  submit_queue, polling_delay, mem_limit, max_active_jobs)
         
         self.run_cmd = self.getRunCmd()
         self.run_status_cmd = self.getRunStatusCmd()
+        
+        self.wall_time = wall_time
         
     def submitJob(self, job):
         """ Submit a job to the underlying queue system.  
@@ -674,7 +677,8 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
         script.write('#!/bin/bash\n\n')
         script.write('#PBS -l nodes=1:ppn=1\n')
         script.write("#PBS -l vmem={mem_limit}gb\n".format(mem_limit=self.mem_limit))
-        #script.write('#PBS -l walltime=24:00:00\n') # Try to get by without specifying this
+        if self.wall_time:
+            script.write("#PBS -l walltime={0}:00:00\n".format(self.wall_time)) # Try to get by without specifying this
         script.write('\n')
         script.write(job.cmd_raw)
         script.write('\n')

@@ -114,6 +114,7 @@ class RHESSysCalibrator(object):
                                              session_id, parallel_mode, num_processes, polling_delay, 
                                              queue_name=None, 
                                              mem_limit=None,
+                                             wall_time=None,
                                              restart_runs=False,
                                              bsub_exclusive_mode=False,
                                              simulator_path=None):
@@ -162,7 +163,8 @@ class RHESSysCalibrator(object):
                                                 queue_name,
                                                 polling_delay,
                                                 mem_limit,
-                                                num_processes)
+                                                num_processes,
+                                                wall_time)
             elif PARALLEL_MODE_PROCESS == parallel_mode:
                 consumer = CalibrationRunnerSubprocess(basedir,
                                                        session_id,
@@ -991,6 +993,10 @@ obs/                       Where you will store observed data to be compared to
                           type="int", dest="mem_limit",
                           default=4,
                           help="[ADVANCED; OPTIONAL] For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
+        
+        parser.add_option("--wall_time", action="store",
+                          type="int", dest="wall_time",
+                          help="[ADVANCED; OPTIONAL] For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
 
         (options, args) = parser.parse_args()
 
@@ -1050,8 +1056,14 @@ with the calibration session""")
                 (PARALLEL_MODE_PBS == options.parallel_mode) or
                 (PARALLEL_MODE_PROCESS == options.parallel_mode))
 
-        if options.parallel_mode != PARALLEL_MODE_PROCESS and not options.queue_name:
+        if options.parallel_mode == PARALLEL_MODE_LSF and not options.queue_name:
             parser.error("""Please specify a queue name that is valid for your system.""")
+        
+        wall_time = None
+        if options.parallel_mode == PARALLEL_MODE_PBS and options.wall_time:
+            if options.wall_time < 1 or options.wall_time > 168:
+                parser.error("Wall time must be greater than 0 and less than 169 hours")
+            wall_time = options.wall_time
         
         if not options.polling_delay:
             options.polling_delay = 1
@@ -1131,6 +1143,7 @@ with the calibration session""")
                                                                        self.session.id, options.parallel_mode, options.processes, options.polling_delay,
                                                                        options.queue_name, 
                                                                        mem_limit=options.mem_limit, 
+                                                                       wall_time=wall_time,
                                                                        bsub_exclusive_mode=options.bsub_exclusive_mode,
                                                                        simulator_path=options.simulator_path)
 
@@ -1395,6 +1408,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
                                                                        args.queue_name, 
                                                                        mem_limit=args.mem_limit, 
+                                                                       #wall_time=wall_time,
                                                                        bsub_exclusive_mode=args.bsub_exclusive_mode,
                                                                        simulator_path=args.simulator_path,
                                                                        restart_runs=True)
@@ -1418,7 +1432,8 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                 RHESSysCalibrator.initializeCalibrationRunnerConsumers(self.basedir, self.logger,
                                                                        self.session.id, args.parallel_mode, args.processes, args.polling_delay,
                                                                        args.queue_name, 
-                                                                       mem_limit=args.mem_limit, 
+                                                                       mem_limit=args.mem_limit,
+                                                                       #wall_time=wall_time,
                                                                        bsub_exclusive_mode=args.bsub_exclusive_mode,
                                                                        simulator_path=args.simulator_path)
             
