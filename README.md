@@ -13,6 +13,31 @@ running, and finish (either with or without error).  RHESSysCalibrator supports 
 In addition to creating new calibration sessions, it is also possible
 to re-start sessions that have exited before completion. RHESSysCalibrator also handles calibration post processing (i.e. calculating Nash-Sutcliffe efficiency for modeled vs. observed streamflow), as well as uncertainty estimation using Generalized Likelihood Uncertainty Estimation (GLUE; Beven & Binley 1992).
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Authors](#authors)
+- [Source code](#source-code)
+- [Installation instructions](#installation-instructions)
+- [RHESSys calibration background](#rhessys-calibration-background)
+- [Usage instructions](#usage-instructions)
+- [Setup a new calibrator project](#setup-a-new-calibrator-project)
+- [Configuring a calibration session](#configuring-a-calibration-session)
+- [Create a new calibration session](#create-a-new-calibration-session)
+  - [Using screen to run RHESSysCalibrator on compute clusters](#using-screen-to-run-rhessyscalibrator-on-compute-clusters)
+- [Restarting failed model sessions](#restarting-failed-model-sessions)
+- [Calculate model fitness statistics for basin-level output](#calculate-model-fitness-statistics-for-basin-level-output)
+- [Performing GLUE uncertainty estimation](#performing-glue-uncertainty-estimation)
+  - [Applying behavioral parameter sets to another RHESSys model](#applying-behavioral-parameter-sets-to-another-rhessys-model)
+  - [Visualizing behavioral model output](#visualizing-behavioral-model-output)
+  - [Comparing behavioral simulations](#comparing-behavioral-simulations)
+  - [Visualizing behavioral model output using other tools](#visualizing-behavioral-model-output-using-other-tools)
+- [Appendix](#appendix)
+  - [Model directory structure](#model-directory-structure)
+  - [References](#references)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 Authors
 -------
@@ -262,10 +287,9 @@ See:
 
 for a complete description of possible options.
 	
-Appendix
---------  
+## Appendix  
 
-## Model directory structure
+### Model directory structure
 Before running rhessys_calibrator.py to perform calibrations, it is first 
 necessary to create the session directory structure.  This is done by
 issuing the --create argument, along with the always-required
@@ -305,8 +329,7 @@ obs/                       Where you will store observed data to be compared to
                             data from calibration model runs.
 ```
 
-References
-----------
+### References
 Beven, K. & Binley, A., 1992. The future of distributed models: Model calibration and uncertainty prediction. Hydrological Processes, 6(3), pp.279–298.
 
 Jin, X., Xu, C.-Y., Zhang, Q., & Singh, V. P., 2010. Parameter and modeling uncertainty simulated by GLUE and a formal Bayesian method for a conceptual hydrological model. Journal of Hydrology, 383(3-4), pp.147–155.
