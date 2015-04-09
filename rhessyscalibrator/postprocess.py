@@ -71,9 +71,9 @@ class RHESSysCalibratorPostprocess(object):
 #     YEAR_HEADER = 'year'
     
     PARAM_S1_IDX = 0
-    PARAM_S1_NAME = 'm'
+    PARAM_S1_NAME = 'm - drainage'
     PARAM_S2_IDX = 1
-    PARAM_S2_NAME = 'lateral Ksat0'
+    PARAM_S2_NAME = 'Ksat0 - drainage'
     PARAM_S3_IDX = 2
     PARAM_S3_NAME = 'soil depth'
     PARAM_SV1_IDX = 3
