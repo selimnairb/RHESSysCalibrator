@@ -9,7 +9,7 @@ setup(name='rhessyscalibrator',
       description='Libraries and command-line scripts for handling RHESSys model calibration.',
       long_description=readme(),
       classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: BSD License',
