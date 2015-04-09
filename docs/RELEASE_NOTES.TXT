@@ -1,0 +1,5 @@
+# 1.0.30 - 4/10/2015
+  - Add support for installation via PyPi using pip
+  - Add comprehensive manual
+  - Add support for PBS/TORQUE-based compute clusers in addition to
+    LSF-based clusters and multiprocessor-based parallel runs.
