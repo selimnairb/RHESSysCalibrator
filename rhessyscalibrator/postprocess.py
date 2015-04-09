@@ -1110,12 +1110,12 @@ Run "%prog --help" for detailed description of all options
                 
                 # Generate and save dotty plot
                 dottyFilename = "dotty_plots_SESSION_%s_%s" % ( options.session_id, options.period )
-                self.saveDottyPlot(outdirPath, dottyFilename, format='PNG', 
+                self.saveDottyPlot(outdirPath, dottyFilename, format='PDF', 
                                    sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
                 
                 # Generate and save covariance plot
                 covFilename = "cov_plots_SESSION_%s_%s" % ( options.session_id, options.period )
-                self.saveCovariancePlot(outdirPath, covFilename, format='PNG', 
+                self.saveCovariancePlot(outdirPath, covFilename, format='PDF', 
                                         sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
                 
                
