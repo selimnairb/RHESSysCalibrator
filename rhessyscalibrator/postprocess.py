@@ -1048,6 +1048,19 @@ Run "%prog --help" for detailed description of all options
                         sys.exit("Unable to find end date %s in model data %s" %
                                  (str(endDate), tmpOutfile) )
                     
+                    # Make sure modeled output has the right amount of data
+                    try:
+                        model_datetime[modelStartIdx]
+                        model_datetime[modelEndIdx]
+                    except IndexError:
+                        print("Length of time series for runid: %d differs from what is expected. Output dir: %s\n\nSkipping..." % (run.id, runOutput))
+                        # Invalidate fitness parameters for this run
+                        calibratorDB.updateRunFitnessResults(run.id,
+                                                             None,
+                                                             None,
+                                                             None)
+                        continue
+                    
                     self.logger.debug("Runid: %d" % (run.id,) )    
                     self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
                           (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
