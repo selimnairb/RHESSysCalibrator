@@ -31,6 +31,8 @@ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+@note To run: PYTHONPATH=../EcohydroLib:../RHESSysWorkflows python -m unittest discover
+@note Assumes EcohydroLib and RHESSysWorkflows source are in ".."
 
 @author Brian Miles <brian_miles@unc.edu>
 """
@@ -136,7 +138,7 @@ class TestClusterCalibrator(unittest.TestCase):
         
         worldfiles = self.clusterCalibrator.getWorldfiles(self.basedir)
 
-        (res, flowtablePath, worldfilesWithoutFlowTables) = \
+        (res, flowtablePath, surfaceFlowtablePath, worldfilesWithoutFlowTables, worldfilesWithoutSurfaceFlowTables) = \
             self.clusterCalibrator.verifyFlowTables(self.basedir, worldfiles.keys())
 
         self.assertTrue(res)
@@ -200,7 +202,7 @@ class TestClusterCalibrator(unittest.TestCase):
 
         worldfiles = self.clusterCalibrator.getWorldfiles(self.basedir)
 
-        (res, flowtablePath, worldfilesWithoutFlowTables) = \
+        (res, flowtablePath, surfaceFlowtablePath, worldfilesWithoutFlowTables, worldfilesWithoutSurfaceFlowTables) = \
             self.clusterCalibrator.verifyFlowTables(self.basedir, worldfiles.keys())
 
         itr = 1

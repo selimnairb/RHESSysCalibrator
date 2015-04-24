@@ -31,6 +31,8 @@ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
 LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+@note To run: PYTHONPATH=../EcohydroLib:../RHESSysWorkflows python -m unittest discover
+@note Assumes EcohydroLib and RHESSysWorkflows source are in ".."
 
 @author Brian Miles <brian_miles@unc.edu>
 """
@@ -90,7 +92,7 @@ class TestClusterCalibrator(unittest.TestCase):
         runStatus_final = self.calibratorDB.getRunStatus(insertedRunID)
         self.assertNotEqual(runStatus_post, runStatus_final)
 
-        self.calibratorDB.updateRunFitnessResults(insertedRunID, 1.0, 0.9)
+        self.calibratorDB.updateRunFitnessResults(insertedRunID, 'daily', 1.0, 0.9)
 
         self.calibratorDB.updateSessionObservationFilename(insertedSessionID,
                                                            "obsfile.csv")
@@ -117,7 +119,7 @@ class TestClusterCalibrator(unittest.TestCase):
         self.assertEqual(fetchedRun.param_vgsen3, 0.43)
         self.assertEqual(fetchedRun.cmd_raw, "rhessys -w worldfile1 ..")
         self.assertEqual(fetchedRun.output_path, "run_12345_worlfile1")
-        self.assertEqual(fetchedRun.job_id, 12345)
+        self.assertEqual(fetchedRun.job_id, '12345')
         self.assertEqual(fetchedRun.status, "DONE")
         self.assertEqual(fetchedRun.nse, 1.0)
         self.assertEqual(fetchedRun.nse_log, 0.9)
