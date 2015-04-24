@@ -54,19 +54,39 @@ class CalibrationParametersProto(object):
                        'svalt2':[0.5, 2]}
 
     def __init__(self, s_for_sv=False):
-        self.s1 = False
-        self.s2 = False
-        self.s3 = False
-        self.sv1 = False
-        self.sv2 = False
-        self.gw1 = False
-        self.gw2 = False
-        self.vgsen1 = False
-        self.vgsen2 = False
-        self.vgsen3 = False
-        self.svalt1 = False
-        self.svalt2 = False
         self.s_for_sv = s_for_sv
+        
+        self.s1 = False
+        self.s1_range = self.parameterRanges['s1']
+        self.s2 = False
+        self.s2_range = self.parameterRanges['s2']
+        self.s3 = False
+        self.s3_range = self.parameterRanges['s3']
+        self.sv1 = False
+        if self.s_for_sv:
+            self.sv1_range = self.s1_range
+        else:
+            self.sv1_range = self.parameterRanges['sv1']
+        self.sv2 = False
+        if self.s_for_sv:
+            self.sv2_range = self.s2_range
+        else:
+            self.sv2_range = self.parameterRanges['sv2']
+        self.gw1 = False
+        self.gw1_range = self.parameterRanges['gw1']
+        self.gw2 = False
+        self.gw2_range = self.parameterRanges['gw2']
+        self.vgsen1 = False
+        self.vgsen1_range = self.parameterRanges['vgsen1']
+        self.vgsen2 = False
+        self.vgsen2_range = self.parameterRanges['vgsen2']
+        self.vgsen3 = False
+        self.vgsen3_range = self.parameterRanges['vgsen3']
+        self.svalt1 = False
+        self.svalt1_range = self.parameterRanges['svalt1']
+        self.svalt2 = False
+        self.svalt2_range = self.parameterRanges['svalt2']
+        
 
         
     def generateParameterValues(self):
@@ -82,71 +102,59 @@ class CalibrationParametersProto(object):
             CalibrationParameters.newCalibrationParameters()
 
         if self.s1:
-            paramRange = self.parameterRanges['s1']
-            calibrationParameters.s1 = uniform(paramRange[0], 
-                                               paramRange[1])
+            calibrationParameters.s1 = uniform(self.s1_range[0], 
+                                               self.s1_range[1])
         if self.s2:
-            paramRange = self.parameterRanges['s2']
-            calibrationParameters.s2 = uniform(paramRange[0], 
-                                               paramRange[1])
+            calibrationParameters.s2 = uniform(self.s2_range[0], 
+                                               self.s2_range[1])
 
         if self.s3:
-            paramRange = self.parameterRanges['s3']
-            calibrationParameters.s3 = uniform(paramRange[0], 
-                                               paramRange[1])
+            calibrationParameters.s3 = uniform(self.s3_range[0], 
+                                               self.s3_range[1])
 
         if self.sv1:
             if self.s_for_sv:
                 assert(calibrationParameters.s1)
                 calibrationParameters.sv1 = calibrationParameters.s1
             else:
-                paramRange = self.parameterRanges['sv1']
-                calibrationParameters.sv1 = uniform(paramRange[0], 
-                                                    paramRange[1])
+                calibrationParameters.sv1 = uniform(self.sv1_range[0], 
+                                                    self.sv1_range[1])
 
         if self.sv2:
             if self.s_for_sv:
                 assert(calibrationParameters.s2)
                 calibrationParameters.sv2 = calibrationParameters.s2
             else:
-                paramRange = self.parameterRanges['sv2']
-                calibrationParameters.sv2 = uniform(paramRange[0], 
-                                                    paramRange[1])
+                calibrationParameters.sv2 = uniform(self.sv2_range[0], 
+                                                    self.sv2_range[1])
             
         if self.gw1:
-            paramRange = self.parameterRanges['gw1']
-            calibrationParameters.gw1 = uniform(paramRange[0], 
-                                                paramRange[1])
+            calibrationParameters.gw1 = uniform(self.gw1_range[0], 
+                                                self.gw1_range[1])
 
         if self.gw2:
-            paramRange = self.parameterRanges['gw2']
-            calibrationParameters.gw2 = uniform(paramRange[0], 
-                                                paramRange[1])
+            calibrationParameters.gw2 = uniform(self.gw2_range[0], 
+                                                self.gw2_range[1])
             
         if self.vgsen1:
-            paramRange = self.parameterRanges['vgsen1']
-            calibrationParameters.vgsen1 = uniform(paramRange[0],
-                                                   paramRange[1])
+            calibrationParameters.vgsen1 = uniform(self.vgsen1_range[0],
+                                                   self.vgsen1_range[1])
         
         if self.vgsen2:
-            paramRange = self.parameterRanges['vgsen2']
-            calibrationParameters.vgsen2 = uniform(paramRange[0],
-                                                   paramRange[1])
+            calibrationParameters.vgsen2 = uniform(self.vgsen2_range[0],
+                                                   self.vgsen2_range[1])
             
         if self.vgsen3:
-            paramRange = self.parameterRanges['vgsen3']
-            calibrationParameters.vgsen3 = uniform(paramRange[0],
-                                                   paramRange[1])
+            calibrationParameters.vgsen3 = uniform(self.vgsen3_range[0],
+                                                   self.vgsen3_range[1])
             
         if self.svalt1:
-            paramRange = self.parameterRanges['svalt1']
-            calibrationParameters.svalt1 = uniform(paramRange[0],
-                                                   paramRange[1])
+            calibrationParameters.svalt1 = uniform(self.svalt1_range[0],
+                                                   self.svalt1_range[1])
         
         if self.svalt2:
-            paramRange = self.parameterRanges['svalt2']
-            calibrationParameters.svalt2 = uniform(paramRange[0],
-                                                   paramRange[1])
+            calibrationParameters.svalt2 = uniform(self.svalt1_range[0],
+                                                   self.svalt1_range[1])
             
         return calibrationParameters
 

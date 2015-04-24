@@ -307,12 +307,23 @@ class RHESSysCalibrator(object):
         """
         paramsProto = CalibrationParametersProto(s_for_sv=s_for_sv)
 
+        #  m = re.search("\s+(\$s1(\[(\d+(?:\.\d+){0,1})\:(\d+(?:\.\d+){0,1})\])?)\s+", " -s $s1[0.01:20] ")
+        
+
         # Check for -s argument
         if string.count(cmd_proto, " -s ") > 0:
             if string.count(cmd_proto, "$s1") > 0:
                 if string.count(cmd_proto, "$s2") > 0:
                     paramsProto.s1 = True
                     paramsProto.s2 = True
+                    # Get parameter ranges, if they exist
+                    m = re.search("\s+(\$s1(\[(\d+(?:\.\d+){0,1})\:(\d+(?:\.\d+){0,1})\])?)\s+",
+                                  cmd_proto)
+                    if m.group(3) != None:
+                        if m.group(4) == None:
+                            raise Exception("Ending parameter range missing for parameter s1")
+                        #paramsProto.s1_range = [float(m.group(3)), float(m.group(4))]
+                        
                 else:
                     raise Exception("Parameter s2 must be supplied if parameter s1 is specified")
                 if string.count(cmd_proto, "$s3") > 0:
