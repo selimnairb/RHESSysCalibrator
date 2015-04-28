@@ -480,11 +480,15 @@ class RHESSysCalibrator(object):
         return template.substitute(output_path=output_path_with_slash)
 
 
-    def createVerifyDirectoryStructure(self, basedir):
+    def createVerifyDirectoryStructure(self, basedir, cmd_proto_all=False, cmd_proto_ranges=True):
         """ Verify that calibration session directory structure is present,
             create directories as needed.
 
             @param basedir String representing the path to the basedir
+            @param cmd_proto_all True if all possible parameters should be included in the template
+            cmd.proto (only applies if cmd.proto is generated)
+            @param cmd_proto_ranges True if parameter ranges should in included in the template
+            cmd.proto (only applies if cmd.proto is generated)
 
             @raise IOError is basedir is not writeable.  
             @raise OSError if any directory creation fails.  Raises IOError if creation
@@ -589,7 +593,7 @@ class RHESSysCalibrator(object):
         if not os.path.exists(self._cmd_proto):
             try:
                 file = open(self._cmd_proto, "w")
-                file.write(self._generateCmdProto())
+                file.write(self._generateCmdProto(ranges=cmd_proto_ranges, all_params=cmd_proto_all))
                 file.close()
             except:
                 raise
@@ -919,6 +923,11 @@ obs/                       Where you will store observed data to be compared to
         parser.add_option("-c", "--create", action="store_true", dest="create",
                           help="[OPTIONAL] create calibration session directory structure within $BASEDIR and then exit (this will not overwrite or delete any existing files or directories in $BASEDIR).  Once the session directory has been created the file $BASEDIR/cmd.proto will be created.  This file will be used by %prog as a prototype for launching each run in the calibration session.  You will need to edit cmd.proto to suit your modeling needs, however be careful to maintain the formatting conventions (i.e. for the locations of files, and sensitivity parameters) so that %prog will be able to parse cmd.proto")
         
+        parser.add_option("--allparams", action="store_true", dest="allparams",
+                          help="[OPTIONAL] include all possible parameters in cmd.proto generated.  Note: only applies when 'create' option is specified.")
+        parser.add_option("--noparamranges", action="store_true", dest="noparamranges",
+                          help="[OPTIONAL] include parameter ranges in cmd.proto generated.  Note: only applies when 'create' option is specified.")
+        
         parser.add_option("-u", "--user", action="store", type="string",
                           dest="user",
                           help="[OPTIONAL] user to associate with the calibration session.  If not supplied, the value of os.getlogin() will be used.")
@@ -993,7 +1002,9 @@ obs/                       Where you will store observed data to be compared to
 
         # Create/verify directory structure in session directory
         try:
-            self.createVerifyDirectoryStructure(self.basedir)
+            self.createVerifyDirectoryStructure(self.basedir,
+                                                cmd_proto_all=options.allparams,
+                                                cmd_proto_ranges= not options.noparamranges)
 
             if options.create:
                 # --create option was specified, just exit
