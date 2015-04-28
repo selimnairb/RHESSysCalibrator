@@ -261,16 +261,29 @@ class RHESSysCalibrator(object):
         self.logger.addHandler(consoleHandler)
         
 
-    def _generateCmdProto(self, surface=False):
+    def _generateCmdProto(self, surface=False, ranges=True, all_params=False):
         """ Generates a cmd.proto string to be written to a file.
 
-            @param surface True if surface flowtable template variable is to be generated
+            @param surface True if surface flowtable template variable is to be generated.  Default: False
+            @param ranges True if cmd.proto should include parameter range definitions.  Default: True
+            @param all_params True if all supported parameters should be included in param.proto.  Default: False
             @return String representing the prototype command
         """
         if surface:
-            cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable $surface_flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+            cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable $surface_flowtable"""
         else:
-            cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+            cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable"""
+        
+        if all_params:
+            if ranges:
+                cmd_proto += """ -pre $output_path -s $s1[0.01, 20.0] $s2[1.0, 150.0] $s3[0.1, 10.0] -sv $sv1[0.01, 20.0] $sv2[1.0, 150.0] -vgsen $vgsen1[0.5, 2.0] $vgsen2[0.5, 2.0] $vgsen3[0.5, 2.0] -svalt $svalt1[0.5, 2.0] $svalt2[0.5, 2.0] -gw $gw1[0.001, 0.3] $gw2[0.01, 0.9]"""
+            else:
+                cmd_proto += """ -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -vgsen $vgsen1 $vgsen2 $vgsen3 -svalt $svalt1 $svalt2 -gw $gw1 $gw2"""
+        else:
+            if ranges:
+                cmd_proto += """ -pre $output_path -s $s1[0.01, 20.0] $s2[1.0, 150.0] $s3[0.1, 10.0] -sv $sv1[0.01, 20.0] $sv2[1.0, 150.0] -gw $gw1[0.001, 0.3] $gw2[0.01, 0.9]"""
+            else:
+                cmd_proto += """ -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2"""
         
         return cmd_proto
 
@@ -290,7 +303,7 @@ class RHESSysCalibrator(object):
 
         return cmd_proto
 
-
+    
     def parseCmdProtoForParams(self, cmd_proto, s_for_sv=False):
         """ Parses cmd.proto and determines what calibration parameters
             are specified
@@ -299,86 +312,42 @@ class RHESSysCalibrator(object):
             @param s_for_sv If true use the same m and K parameters for
                                for horizontal as for vertical. Defaults to false (0).
 
-            @return CalibrationParameters instance where parameters
+            @return CalibrationParametersProto instance where parameters
             present in cmd.proto are set to True, and those not found
-            in cmd.proto set to false.
+            in cmd.proto set to false, with parameter ranges set according to
+            those defined in cmd.proto.
 
             @raise Exception if illegal parameter combinations are provided
         """
         paramsProto = CalibrationParametersProto(s_for_sv=s_for_sv)
-
-        #  m = re.search("\s+(\$s1(\[(\d+(?:\.\d+){0,1})\:(\d+(?:\.\d+){0,1})\])?)\s+", " -s $s1[0.01:20] ")
+        paramsProto.parseParameterString(cmd_proto)
         
+        # Validate -s parameters
+        if (paramsProto.s1 and not paramsProto.s2) or (paramsProto.s2 and not paramsProto.s1):
+            raise Exception("Parameters s1 and s2 must be supplied if argument -s is specified")
+        
+        if paramsProto.s3 and not (paramsProto.s1 and paramsProto.s2):
+            raise Exception("Parameters s1 and s2 must be supplied if s3 parameter is specified")
+        
+        # Validate -sv parameters
+        if (paramsProto.sv1 and not paramsProto.sv2) or (paramsProto.sv2 and not paramsProto.sv1):
+            raise Exception("Parameters sv1 and sv2 must be supplied if argument -sv is specified")
 
-        # Check for -s argument
-        if string.count(cmd_proto, " -s ") > 0:
-            if string.count(cmd_proto, "$s1") > 0:
-                if string.count(cmd_proto, "$s2") > 0:
-                    paramsProto.s1 = True
-                    paramsProto.s2 = True
-                    # Get parameter ranges, if they exist
-                    m = re.search("\s+(\$s1(\[(\d+(?:\.\d+){0,1})\:(\d+(?:\.\d+){0,1})\])?)\s+",
-                                  cmd_proto)
-                    if m.group(3) != None:
-                        if m.group(4) == None:
-                            raise Exception("Ending parameter range missing for parameter s1")
-                        #paramsProto.s1_range = [float(m.group(3)), float(m.group(4))]
-                        
-                else:
-                    raise Exception("Parameter s2 must be supplied if parameter s1 is specified")
-                if string.count(cmd_proto, "$s3") > 0:
-                    # param s3 is optional
-                    paramsProto.s3 = True
-            else:
-                raise Exception("Parameters s1 and s2 must be supplied if -s argument is specified")
+        # Validate -gw parameters
+        if (paramsProto.gw1 and not paramsProto.gw2) or (paramsProto.gw2 and not paramsProto.gw1):
+            raise Exception("Parameters gw1 and gw2 must be supplied if argument -gw is specified")
 
-        # Check for -sv argument
-        if string.count(cmd_proto, " -sv ") > 0:
-            if string.count(cmd_proto, "$sv1") > 0:
-                if string.count(cmd_proto, "$sv2") > 0:
-                    paramsProto.sv1 = True
-                    paramsProto.sv2 = True
-                else:
-                    raise Exception("Parameter sv2 must be supplied if parameter sv1 is specified")
-            else:
-                raise Exception("Parameters sv1 and sv2 must be supplied if -sv argument is specified")
+        # Validate -vgsen parameters
+        if (paramsProto.vgsen1 and not paramsProto.vgsen2) or (paramsProto.vgsen2 and not paramsProto.vgsen1):
+            raise Exception("Parameters vgsen1 and vgsen2 must be supplied if argument -vgsen is specified")
+        
+        if paramsProto.vgsen3 and not (paramsProto.vgsen1 and paramsProto.vgsen2):
+            raise Exception("Parameters vgsen1 and vgsen2 must be supplied if vgsen3 parameter is specified")
 
-        # Check for -gw arument
-        if string.count(cmd_proto, " -gw ") > 0:
-            if string.count(cmd_proto, "$gw1") > 0:
-                if string.count(cmd_proto, "$gw2") > 0:
-                    paramsProto.gw1 = True
-                    paramsProto.gw2 = True
-                else:
-                    raise Exception("Parameter gw2 must be supplied if parameter gw1 is specified")
-            else:
-                raise Exception("Parameters gw1 and gw2 must be supplied if -gw argument is specified")
-
-        # Check for -vgsen arguments
-        if string.count(cmd_proto, " -vgsen ") > 0:
-            if string.count(cmd_proto, "$vgsen1") > 0:
-                if string.count(cmd_proto, "$vgsen2") > 0:
-                    paramsProto.vgsen1 = True
-                    paramsProto.vgsen2 = True
-                else:
-                    raise Exception("Parameter vgsen2 must be supplied if parameter vgsen1 is specified")
-                if string.count(cmd_proto, "$vgsen3") > 0:
-                    # param vgsen3 is optional
-                    paramsProto.vgsen3 = True
-            else:
-                raise Exception("Parameters vgsen1 and vgsen2 must be supplied if -vgsen argument is specified")
-
-        # Check for -svalt arguments
-        if string.count(cmd_proto, " -svalt ") > 0:
-            if string.count(cmd_proto, "$svalt1") > 0:
-                if string.count(cmd_proto, "$svalt2") > 0:
-                    paramsProto.svalt1 = True
-                    paramsProto.svalt2 = True
-                else:
-                    raise Exception("Parameter svalt2 must be supplied if parameter if svalt1 is specified")
-            else:
-                raise Exception("Parameters svalt1 and svalt2 must be supplied is -svalt argument is specified")
-
+        # Validate -svalt parameters
+        if (paramsProto.svalt1 and not paramsProto.svalt2) or (paramsProto.svalt2 and not paramsProto.svalt1):
+            raise Exception("Parameters svalt1 and svalt2 must be supplied if argument -svalt is specified")
+        
         return paramsProto
 
 

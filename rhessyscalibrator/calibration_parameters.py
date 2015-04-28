@@ -33,62 +33,79 @@ OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 @author Brian Miles <brian_miles@unc.edu>
 """
+import re
 from random import *
+
+
+PARAM_REGEX_TEMPLATE = lambda v: """\s+(\$""" + v + """(\[(\d+(?:\.\d+){0,1}),\s*(\d+(?:\.\d+){0,1})\])?)\s*"""
 
 class CalibrationParametersProto(object):
     """ Represents whether particular calibration parameters have been
         specified using boolean values
-    """
-
-    parameterRanges = {'s1':[0.01, 20],
-                       's2':[1, 150],
-                       's3':[0.1, 10],
-                       'sv1':[0.01, 20],
-                       'sv2':[1, 150],
-                       'gw1':[0.001, 0.3],
-                       'gw2':[0.01, 0.9],
-                       'vgsen1':[0.5, 2],
-                       'vgsen2':[0.5, 2], 
-                       'vgsen3':[1, 1],
-                       'svalt1':[0.5, 2],
-                       'svalt2':[0.5, 2]}
-
+    """    
     def __init__(self, s_for_sv=False):
         self.s_for_sv = s_for_sv
         
         self.s1 = False
-        self.s1_range = self.parameterRanges['s1']
         self.s2 = False
-        self.s2_range = self.parameterRanges['s2']
         self.s3 = False
-        self.s3_range = self.parameterRanges['s3']
         self.sv1 = False
-        if self.s_for_sv:
-            self.sv1_range = self.s1_range
-        else:
-            self.sv1_range = self.parameterRanges['sv1']
         self.sv2 = False
-        if self.s_for_sv:
-            self.sv2_range = self.s2_range
-        else:
-            self.sv2_range = self.parameterRanges['sv2']
         self.gw1 = False
-        self.gw1_range = self.parameterRanges['gw1']
         self.gw2 = False
-        self.gw2_range = self.parameterRanges['gw2']
         self.vgsen1 = False
-        self.vgsen1_range = self.parameterRanges['vgsen1']
         self.vgsen2 = False
-        self.vgsen2_range = self.parameterRanges['vgsen2']
         self.vgsen3 = False
-        self.vgsen3_range = self.parameterRanges['vgsen3']
         self.svalt1 = False
-        self.svalt1_range = self.parameterRanges['svalt1']
         self.svalt2 = False
-        self.svalt2_range = self.parameterRanges['svalt2']
         
-
+        self.parameterRanges = {'s1':[0.01, 20.0],
+                                's2':[1.0, 150.0],
+                                's3':[0.1, 10.0],
+                                'sv1':[0.01, 20.0],
+                                'sv2':[1.0, 150.0],
+                                'gw1':[0.001, 0.3],
+                                'gw2':[0.01, 0.9],
+                                'vgsen1':[0.5, 2.0],
+                                'vgsen2':[0.5, 2.0], 
+                                'vgsen3':[0.5, 2.0],
+                                'svalt1':[0.5, 2.0],
+                                'svalt2':[0.5, 2.0]}
+    
+    def parseParameterString(self, param_string):
+        """ Parse parameter string for presence and range of all possible calibration
+            parameters.
+            
+            @param param_string String representing the list of parameters, and optionally ranges.
+        """
+        for param in self.parameterRanges.keys():
+            self.setPresenceAndRangeForParameter(param, param_string)
+            
+    def setPresenceAndRangeForParameter(self, param_name, param_string):
+        """ Parses param_string for presence and optionally range of parameter param_name.
         
+            @param param_name String representing parameter name (e.g. 's1', 'gw1', etc.)
+            @param param_string String representing the list of parameters, and optionally ranges.
+        
+            @raise Exception if param_name is not recognized
+            @raise Exception if ceiling of parameter range is not greater than the floor.
+        """
+        if not (param_name in self.parameterRanges.keys()):
+            raise Exception("Parameter name {0} is not known".format(param_name))
+        m = re.search(PARAM_REGEX_TEMPLATE(param_name), param_string)
+        if m:
+            self.__dict__[param_name] = True
+            if m.group(3) != None:
+                if m.group(4) == None:
+                    raise Exception("Ending parameter range missing for parameter {0}".format(param_name))
+                floor = float(m.group(3))
+                ceil = float(m.group(4))
+                if floor >= ceil:
+                    raise Exception("Floor ({floor}) of parameter {param} is not less than ceiling ({ceil})".format(floor,
+                                                                                                                    param_name,
+                                                                                                                    ceil))
+                self.parameterRanges[param_name] = [floor, ceil]
+    
     def generateParameterValues(self):
         """ Generate random values for parameters specified as True
 
@@ -97,64 +114,64 @@ class CalibrationParametersProto(object):
 
             @return CalibrationParameters object containing random
             values for each enabled parameter.
-        """
+        """ 
         calibrationParameters = \
             CalibrationParameters.newCalibrationParameters()
 
         if self.s1:
-            calibrationParameters.s1 = uniform(self.s1_range[0], 
-                                               self.s1_range[1])
+            calibrationParameters.s1 = uniform(self.parameterRanges['s1'][0], 
+                                               self.parameterRanges['s1'][1])
         if self.s2:
-            calibrationParameters.s2 = uniform(self.s2_range[0], 
-                                               self.s2_range[1])
+            calibrationParameters.s2 = uniform(self.parameterRanges['s2'][0], 
+                                               self.parameterRanges['s2'][1])
 
         if self.s3:
-            calibrationParameters.s3 = uniform(self.s3_range[0], 
-                                               self.s3_range[1])
+            calibrationParameters.s3 = uniform(self.parameterRanges['s3'][0], 
+                                               self.parameterRanges['s3'][1])
 
         if self.sv1:
             if self.s_for_sv:
                 assert(calibrationParameters.s1)
                 calibrationParameters.sv1 = calibrationParameters.s1
             else:
-                calibrationParameters.sv1 = uniform(self.sv1_range[0], 
-                                                    self.sv1_range[1])
+                calibrationParameters.sv1 = uniform(self.parameterRanges['sv1'][0], 
+                                                    self.parameterRanges['sv1'][1])
 
         if self.sv2:
             if self.s_for_sv:
                 assert(calibrationParameters.s2)
                 calibrationParameters.sv2 = calibrationParameters.s2
             else:
-                calibrationParameters.sv2 = uniform(self.sv2_range[0], 
-                                                    self.sv2_range[1])
+                calibrationParameters.sv2 = uniform(self.parameterRanges['sv2'][0], 
+                                                    self.parameterRanges['sv2'][1])
             
         if self.gw1:
-            calibrationParameters.gw1 = uniform(self.gw1_range[0], 
-                                                self.gw1_range[1])
+            calibrationParameters.gw1 = uniform(self.parameterRanges['gw1'][0], 
+                                                self.parameterRanges['gw1'][1])
 
         if self.gw2:
-            calibrationParameters.gw2 = uniform(self.gw2_range[0], 
-                                                self.gw2_range[1])
+            calibrationParameters.gw2 = uniform(self.parameterRanges['gw2'][0], 
+                                                self.parameterRanges['gw2'][1])
             
         if self.vgsen1:
-            calibrationParameters.vgsen1 = uniform(self.vgsen1_range[0],
-                                                   self.vgsen1_range[1])
+            calibrationParameters.vgsen1 = uniform(self.parameterRanges['vgsen1'][0],
+                                                   self.parameterRanges['vgsen1'][1])
         
         if self.vgsen2:
-            calibrationParameters.vgsen2 = uniform(self.vgsen2_range[0],
-                                                   self.vgsen2_range[1])
+            calibrationParameters.vgsen2 = uniform(self.parameterRanges['vgsen2'][0],
+                                                   self.parameterRanges['vgsen2'][1])
             
         if self.vgsen3:
-            calibrationParameters.vgsen3 = uniform(self.vgsen3_range[0],
-                                                   self.vgsen3_range[1])
+            calibrationParameters.vgsen3 = uniform(self.parameterRanges['vgsen3'][0],
+                                                   self.parameterRanges['vgsen3'][1])
             
         if self.svalt1:
-            calibrationParameters.svalt1 = uniform(self.svalt1_range[0],
-                                                   self.svalt1_range[1])
+            calibrationParameters.svalt1 = uniform(self.parameterRanges['svalt1'][0],
+                                                   self.parameterRanges['svalt1'][1])
         
         if self.svalt2:
-            calibrationParameters.svalt2 = uniform(self.svalt1_range[0],
-                                                   self.svalt1_range[1])
+            calibrationParameters.svalt2 = uniform(self.parameterRanges['svalt2'][0],
+                                                   self.parameterRanges['svalt2'][1])
             
         return calibrationParameters
 

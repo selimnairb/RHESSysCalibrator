@@ -45,9 +45,11 @@ import re
 import string
 from shutil import rmtree
 from zipfile import ZipFile
+import tempfile
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db import *
+from rhessyscalibrator.calibration_parameters import *
 
 class TestClusterCalibrator(unittest.TestCase):
 
@@ -147,6 +149,245 @@ class TestClusterCalibrator(unittest.TestCase):
 #        else:
 #            for worldfile in worldfilesWithoutFlowTables:
 #                print "%s has no flow table" % worldfile 
+
+    def testParseCmdProtoCustomRangesDefaultParams(self):
+        cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable"""
+        cmd_proto += """ -pre $output_path -s $s1[0.02, 30.0] $s2[0.5, 100.0] $s3[0.2, 20.0] -sv $sv1[0.03, 10.0] $sv2[0.1, 250.0] -gw $gw1[0.005, 0.5] $gw2[0.05, 0.75]"""
+        
+        paramsProtoRef = CalibrationParametersProto()
+        
+        paramsProto = CalibrationParametersProto()
+        paramsProto.parseParameterString(cmd_proto)
+        
+        self.assertTrue(paramsProto.s1)
+        self.assertNotEqual(paramsProto.parameterRanges['s1'][0], paramsProtoRef.parameterRanges['s1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['s1'][1], paramsProtoRef.parameterRanges['s1'][1])
+        self.assertEqual(paramsProto.parameterRanges['s1'][0], 0.02)
+        self.assertEqual(paramsProto.parameterRanges['s1'][1], 30)
+        
+        self.assertTrue(paramsProto.s2)
+        self.assertNotEqual(paramsProto.parameterRanges['s2'][0], paramsProtoRef.parameterRanges['s2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['s2'][1], paramsProtoRef.parameterRanges['s2'][1])
+        self.assertEqual(paramsProto.parameterRanges['s2'][0], 0.5)
+        self.assertEqual(paramsProto.parameterRanges['s2'][1], 100)
+        
+        self.assertTrue(paramsProto.s3)
+        self.assertNotEqual(paramsProto.parameterRanges['s3'][0], paramsProtoRef.parameterRanges['s3'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['s3'][1], paramsProtoRef.parameterRanges['s3'][1])
+        self.assertEqual(paramsProto.parameterRanges['s3'][0], 0.2)
+        self.assertEqual(paramsProto.parameterRanges['s3'][1], 20)
+        
+        self.assertTrue(paramsProto.sv1)
+        self.assertNotEqual(paramsProto.parameterRanges['sv1'][0], paramsProtoRef.parameterRanges['sv1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['sv1'][1], paramsProtoRef.parameterRanges['sv1'][1])
+        self.assertEqual(paramsProto.parameterRanges['sv1'][0], 0.03)
+        self.assertEqual(paramsProto.parameterRanges['sv1'][1], 10)
+        
+        self.assertTrue(paramsProto.sv2)
+        self.assertNotEqual(paramsProto.parameterRanges['sv2'][0], paramsProtoRef.parameterRanges['sv2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['sv2'][1], paramsProtoRef.parameterRanges['sv2'][1])
+        self.assertEqual(paramsProto.parameterRanges['sv2'][0], 0.1)
+        self.assertEqual(paramsProto.parameterRanges['sv2'][1], 250)
+        
+        self.assertTrue(paramsProto.gw1)
+        self.assertNotEqual(paramsProto.parameterRanges['gw1'][0], paramsProtoRef.parameterRanges['gw1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['gw1'][1], paramsProtoRef.parameterRanges['gw1'][1])
+        self.assertEqual(paramsProto.parameterRanges['gw1'][0], 0.005)
+        self.assertEqual(paramsProto.parameterRanges['gw1'][1], 0.5)
+        
+        self.assertTrue(paramsProto.gw2)
+        self.assertNotEqual(paramsProto.parameterRanges['gw2'][0], paramsProtoRef.parameterRanges['gw2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['gw2'][1], paramsProtoRef.parameterRanges['gw2'][1])
+        self.assertEqual(paramsProto.parameterRanges['gw2'][0], 0.05)
+        self.assertEqual(paramsProto.parameterRanges['gw2'][1], 0.75)
+        
+        self.assertFalse(paramsProto.vgsen1)
+        self.assertFalse(paramsProto.vgsen2)
+        self.assertFalse(paramsProto.vgsen3)
+        self.assertFalse(paramsProto.svalt1)
+        self.assertFalse(paramsProto.svalt2)
+    
+    def testParseCmdProtoCustomRangesAllParams(self):
+        cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable"""
+        cmd_proto += """ -pre $output_path -s $s1[0.02, 30.0] $s2[0.5, 100.0] $s3[0.2, 20.0] -sv $sv1[0.03, 10.0] $sv2[0.1, 250.0] -vgsen $vgsen1[0.25, 4.0] $vgsen2[0.23, 4.5] $vgsen3[0.6, 5.0] -svalt $svalt1[0.7, 6.0] $svalt2[0.8, 7.0] -gw $gw1[0.005, 0.5] $gw2[0.05, 0.75]"""
+        
+        paramsProtoRef = CalibrationParametersProto()
+        
+        paramsProto = CalibrationParametersProto()
+        paramsProto.parseParameterString(cmd_proto)
+        
+        self.assertTrue(paramsProto.s1)
+        self.assertNotEqual(paramsProto.parameterRanges['s1'][0], paramsProtoRef.parameterRanges['s1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['s1'][1], paramsProtoRef.parameterRanges['s1'][1])
+        self.assertEqual(paramsProto.parameterRanges['s1'][0], 0.02)
+        self.assertEqual(paramsProto.parameterRanges['s1'][1], 30)
+        
+        self.assertTrue(paramsProto.s2)
+        self.assertNotEqual(paramsProto.parameterRanges['s2'][0], paramsProtoRef.parameterRanges['s2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['s2'][1], paramsProtoRef.parameterRanges['s2'][1])
+        self.assertEqual(paramsProto.parameterRanges['s2'][0], 0.5)
+        self.assertEqual(paramsProto.parameterRanges['s2'][1], 100)
+        
+        self.assertTrue(paramsProto.s3)
+        self.assertNotEqual(paramsProto.parameterRanges['s3'][0], paramsProtoRef.parameterRanges['s3'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['s3'][1], paramsProtoRef.parameterRanges['s3'][1])
+        self.assertEqual(paramsProto.parameterRanges['s3'][0], 0.2)
+        self.assertEqual(paramsProto.parameterRanges['s3'][1], 20)
+        
+        self.assertTrue(paramsProto.sv1)
+        self.assertNotEqual(paramsProto.parameterRanges['sv1'][0], paramsProtoRef.parameterRanges['sv1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['sv1'][1], paramsProtoRef.parameterRanges['sv1'][1])
+        self.assertEqual(paramsProto.parameterRanges['sv1'][0], 0.03)
+        self.assertEqual(paramsProto.parameterRanges['sv1'][1], 10)
+        
+        self.assertTrue(paramsProto.sv2)
+        self.assertNotEqual(paramsProto.parameterRanges['sv2'][0], paramsProtoRef.parameterRanges['sv2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['sv2'][1], paramsProtoRef.parameterRanges['sv2'][1])
+        self.assertEqual(paramsProto.parameterRanges['sv2'][0], 0.1)
+        self.assertEqual(paramsProto.parameterRanges['sv2'][1], 250)
+        
+        self.assertTrue(paramsProto.gw1)
+        self.assertNotEqual(paramsProto.parameterRanges['gw1'][0], paramsProtoRef.parameterRanges['gw1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['gw1'][1], paramsProtoRef.parameterRanges['gw1'][1])
+        self.assertEqual(paramsProto.parameterRanges['gw1'][0], 0.005)
+        self.assertEqual(paramsProto.parameterRanges['gw1'][1], 0.5)
+        
+        self.assertTrue(paramsProto.gw2)
+        self.assertNotEqual(paramsProto.parameterRanges['gw2'][0], paramsProtoRef.parameterRanges['gw2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['gw2'][1], paramsProtoRef.parameterRanges['gw2'][1])
+        self.assertEqual(paramsProto.parameterRanges['gw2'][0], 0.05)
+        self.assertEqual(paramsProto.parameterRanges['gw2'][1], 0.75)
+        
+        self.assertTrue(paramsProto.vgsen1)
+        self.assertNotEqual(paramsProto.parameterRanges['vgsen1'][0], paramsProtoRef.parameterRanges['vgsen1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['vgsen1'][1], paramsProtoRef.parameterRanges['vgsen1'][1])
+        self.assertEqual(paramsProto.parameterRanges['vgsen1'][0], 0.25)
+        self.assertEqual(paramsProto.parameterRanges['vgsen1'][1], 4)
+        
+        self.assertTrue(paramsProto.vgsen2)
+        self.assertNotEqual(paramsProto.parameterRanges['vgsen2'][0], paramsProtoRef.parameterRanges['vgsen2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['vgsen2'][1], paramsProtoRef.parameterRanges['vgsen2'][1])
+        self.assertEqual(paramsProto.parameterRanges['vgsen2'][0], 0.23)
+        self.assertEqual(paramsProto.parameterRanges['vgsen2'][1], 4.5)
+        
+        self.assertTrue(paramsProto.vgsen3)
+        self.assertNotEqual(paramsProto.parameterRanges['vgsen3'][0], paramsProtoRef.parameterRanges['vgsen3'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['vgsen3'][1], paramsProtoRef.parameterRanges['vgsen3'][1])
+        self.assertEqual(paramsProto.parameterRanges['vgsen3'][0], 0.6)
+        self.assertEqual(paramsProto.parameterRanges['vgsen3'][1], 5)
+        
+        self.assertTrue(paramsProto.svalt1)
+        self.assertNotEqual(paramsProto.parameterRanges['svalt1'][0], paramsProtoRef.parameterRanges['svalt1'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['svalt1'][1], paramsProtoRef.parameterRanges['svalt1'][1])
+        self.assertEqual(paramsProto.parameterRanges['svalt1'][0], 0.7)
+        self.assertEqual(paramsProto.parameterRanges['svalt1'][1], 6)
+        
+        self.assertTrue(paramsProto.svalt2)
+        self.assertNotEqual(paramsProto.parameterRanges['svalt2'][0], paramsProtoRef.parameterRanges['svalt2'][0])
+        self.assertNotEqual(paramsProto.parameterRanges['svalt2'][1], paramsProtoRef.parameterRanges['svalt2'][1])
+        self.assertEqual(paramsProto.parameterRanges['svalt2'][0], 0.8)
+        self.assertEqual(paramsProto.parameterRanges['svalt2'][1], 7)
+    
+    def testParseCmdProtoNoRangesDefaultParams(self):
+        cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable"""
+        cmd_proto += """ -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2"""
+        
+        paramsProtoRef = CalibrationParametersProto()
+        
+        paramsProto = CalibrationParametersProto()
+        paramsProto.parseParameterString(cmd_proto)
+        
+        self.assertTrue(paramsProto.s1)
+        self.assertEqual(paramsProto.parameterRanges['s1'][0], paramsProtoRef.parameterRanges['s1'][0])
+        self.assertEqual(paramsProto.parameterRanges['s1'][1], paramsProtoRef.parameterRanges['s1'][1])
+        
+        self.assertTrue(paramsProto.s2)
+        self.assertEqual(paramsProto.parameterRanges['s2'][0], paramsProtoRef.parameterRanges['s2'][0])
+        self.assertEqual(paramsProto.parameterRanges['s2'][1], paramsProtoRef.parameterRanges['s2'][1])
+        
+        self.assertTrue(paramsProto.s3)
+        self.assertEqual(paramsProto.parameterRanges['s3'][0], paramsProtoRef.parameterRanges['s3'][0])
+        self.assertEqual(paramsProto.parameterRanges['s3'][1], paramsProtoRef.parameterRanges['s3'][1])
+        
+        self.assertTrue(paramsProto.sv1)
+        self.assertEqual(paramsProto.parameterRanges['sv1'][0], paramsProtoRef.parameterRanges['sv1'][0])
+        self.assertEqual(paramsProto.parameterRanges['sv1'][1], paramsProtoRef.parameterRanges['sv1'][1])
+        
+        self.assertTrue(paramsProto.sv2)
+        self.assertEqual(paramsProto.parameterRanges['sv2'][0], paramsProtoRef.parameterRanges['sv2'][0])
+        self.assertEqual(paramsProto.parameterRanges['sv2'][1], paramsProtoRef.parameterRanges['sv2'][1])
+        
+        self.assertTrue(paramsProto.gw1)
+        self.assertEqual(paramsProto.parameterRanges['gw1'][0], paramsProtoRef.parameterRanges['gw1'][0])
+        self.assertEqual(paramsProto.parameterRanges['gw1'][1], paramsProtoRef.parameterRanges['gw1'][1])
+        
+        self.assertTrue(paramsProto.gw2)
+        self.assertEqual(paramsProto.parameterRanges['gw2'][0], paramsProtoRef.parameterRanges['gw2'][0])
+        self.assertEqual(paramsProto.parameterRanges['gw2'][1], paramsProtoRef.parameterRanges['gw2'][1])
+        
+        self.assertFalse(paramsProto.vgsen1)
+        self.assertFalse(paramsProto.vgsen2)
+        self.assertFalse(paramsProto.vgsen3)
+        self.assertFalse(paramsProto.svalt1)
+        self.assertFalse(paramsProto.svalt2)
+    
+    def testParseCmdProtoNoRangesAllParams(self):
+        cmd_proto = """$rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable"""
+        cmd_proto += """ -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -vgsen $vgsen1 $vgsen2 $vgsen3 -svalt $svalt1 $svalt2 -gw $gw1 $gw2"""
+        
+        paramsProtoRef = CalibrationParametersProto()
+        
+        paramsProto = CalibrationParametersProto()
+        paramsProto.parseParameterString(cmd_proto)
+        
+        self.assertTrue(paramsProto.s1)
+        self.assertEqual(paramsProto.parameterRanges['s1'][0], paramsProtoRef.parameterRanges['s1'][0])
+        self.assertEqual(paramsProto.parameterRanges['s1'][1], paramsProtoRef.parameterRanges['s1'][1])
+        
+        self.assertTrue(paramsProto.s2)
+        self.assertEqual(paramsProto.parameterRanges['s2'][0], paramsProtoRef.parameterRanges['s2'][0])
+        self.assertEqual(paramsProto.parameterRanges['s2'][1], paramsProtoRef.parameterRanges['s2'][1])
+        
+        self.assertTrue(paramsProto.s3)
+        self.assertEqual(paramsProto.parameterRanges['s3'][0], paramsProtoRef.parameterRanges['s3'][0])
+        self.assertEqual(paramsProto.parameterRanges['s3'][1], paramsProtoRef.parameterRanges['s3'][1])
+        
+        self.assertTrue(paramsProto.sv1)
+        self.assertEqual(paramsProto.parameterRanges['sv1'][0], paramsProtoRef.parameterRanges['sv1'][0])
+        self.assertEqual(paramsProto.parameterRanges['sv1'][1], paramsProtoRef.parameterRanges['sv1'][1])
+        
+        self.assertTrue(paramsProto.sv2)
+        self.assertEqual(paramsProto.parameterRanges['sv2'][0], paramsProtoRef.parameterRanges['sv2'][0])
+        self.assertEqual(paramsProto.parameterRanges['sv2'][1], paramsProtoRef.parameterRanges['sv2'][1])
+        
+        self.assertTrue(paramsProto.gw1)
+        self.assertEqual(paramsProto.parameterRanges['gw1'][0], paramsProtoRef.parameterRanges['gw1'][0])
+        self.assertEqual(paramsProto.parameterRanges['gw1'][1], paramsProtoRef.parameterRanges['gw1'][1])
+        
+        self.assertTrue(paramsProto.gw2)
+        self.assertEqual(paramsProto.parameterRanges['gw2'][0], paramsProtoRef.parameterRanges['gw2'][0])
+        self.assertEqual(paramsProto.parameterRanges['gw2'][1], paramsProtoRef.parameterRanges['gw2'][1])
+        
+        self.assertTrue(paramsProto.vgsen1)
+        self.assertEqual(paramsProto.parameterRanges['vgsen1'][0], paramsProtoRef.parameterRanges['vgsen1'][0])
+        self.assertEqual(paramsProto.parameterRanges['vgsen1'][1], paramsProtoRef.parameterRanges['vgsen1'][1])
+        
+        self.assertTrue(paramsProto.vgsen2)
+        self.assertEqual(paramsProto.parameterRanges['vgsen2'][0], paramsProtoRef.parameterRanges['vgsen2'][0])
+        self.assertEqual(paramsProto.parameterRanges['vgsen2'][1], paramsProtoRef.parameterRanges['vgsen2'][1])
+        
+        self.assertTrue(paramsProto.vgsen3)
+        self.assertEqual(paramsProto.parameterRanges['vgsen3'][0], paramsProtoRef.parameterRanges['vgsen3'][0])
+        self.assertEqual(paramsProto.parameterRanges['vgsen3'][1], paramsProtoRef.parameterRanges['vgsen3'][1])
+        
+        self.assertTrue(paramsProto.svalt1)
+        self.assertEqual(paramsProto.parameterRanges['svalt1'][0], paramsProtoRef.parameterRanges['svalt1'][0])
+        self.assertEqual(paramsProto.parameterRanges['svalt1'][1], paramsProtoRef.parameterRanges['svalt1'][1])
+        
+        self.assertTrue(paramsProto.svalt2)
+        self.assertEqual(paramsProto.parameterRanges['svalt1'][0], paramsProtoRef.parameterRanges['svalt1'][0])
+        self.assertEqual(paramsProto.parameterRanges['svalt1'][1], paramsProtoRef.parameterRanges['svalt1'][1])
+    
 
     def testPreProcessCmdProto(self):
 
