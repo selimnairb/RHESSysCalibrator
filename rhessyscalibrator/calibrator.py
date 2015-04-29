@@ -1311,16 +1311,16 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             raise Exception("cmd.proto is an empty file")
 
         # Parse calibrations parameters out of cmd.proto
-        paramsProto = self.parseCmdProtoForParams(cmd_proto, args.use_horizontal_m_and_K_for_vertical)
+        (cmd_proto_noparam, paramsProto) = self.parseCmdProtoForParams(cmd_proto, args.use_horizontal_m_and_K_for_vertical)
 
         # Pre-process cmd.proto to add rhessys exec and tecfile path
-        cmd_proto_pre = self.preProcessCmdProto(cmd_proto,
+        cmd_proto_pre = self.preProcessCmdProto(cmd_proto_noparam,
                                                 os.path.join(rhessysExecPath, rhessysExec),
                                                 tecfilePath)
 
         # Check for explicit routing and surface flowtable in cmd_proto, get dicts of
         # flowtables from basedir
-        (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
+        (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto_noparam)
         
         try:
             calibratorDB = \
