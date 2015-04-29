@@ -38,6 +38,7 @@ from random import *
 
 
 PARAM_REGEX_TEMPLATE = lambda v: """\s+(\$""" + v + """(\[(\d+(?:\.\d+){0,1}),\s*(\d+(?:\.\d+){0,1})\])?)\s*"""
+PARAM_INTERVAL_REGEX = '\[\d+(?:\.\d+){0,1},\s*\d+(?:\.\d+){0,1}\]\s*'
 
 class CalibrationParametersProto(object):
     """ Represents whether particular calibration parameters have been

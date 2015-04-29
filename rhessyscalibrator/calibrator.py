@@ -44,21 +44,12 @@ import argparse
 import logging
 from string import Template
 import multiprocessing
-#import string
-
-#import re
-#from subprocess import *
-
-#from random import *
-#import thread # _thread in Python 3
-#import Queue  # queue in Python 3
-#import multiprocessing
-#import time
-#from datetime import datetime
+import re
 
 from rhessyscalibrator.model_runner_db import *
 from rhessyscalibrator.calibration_runner import *
 from rhessyscalibrator.calibration_parameters import *
+from build.lib.rhessyscalibrator import calibration_parameters
 
 # Constants
 PARALLEL_MODE_LSF = 'lsf'
@@ -312,7 +303,9 @@ class RHESSysCalibrator(object):
             @param s_for_sv If true use the same m and K parameters for
                                for horizontal as for vertical. Defaults to false (0).
 
-            @return CalibrationParametersProto instance where parameters
+            @return Tuple<String, CalibrationParametersProto> where the
+            first element represents the cmd.proto with any parameter ranges removed,
+            and the second element is a CalibrationParametersProto instance where parameters
             present in cmd.proto are set to True, and those not found
             in cmd.proto set to false, with parameter ranges set according to
             those defined in cmd.proto.
@@ -348,7 +341,10 @@ class RHESSysCalibrator(object):
         if (paramsProto.svalt1 and not paramsProto.svalt2) or (paramsProto.svalt2 and not paramsProto.svalt1):
             raise Exception("Parameters svalt1 and svalt2 must be supplied if argument -svalt is specified")
         
-        return paramsProto
+        # Strip parameter ranges from cmd.proto
+        cmd_proto_noparam = re.sub(PARAM_INTERVAL_REGEX, ' ', cmd_proto).strip()
+        
+        return (cmd_proto_noparam, paramsProto)
 
 
     def determineRouting(self, cmd_proto):
@@ -1101,16 +1097,16 @@ with the calibration session""")
                 raise Exception("cmd.proto is an empty file")
 
             # Parse calibrations parameters out of cmd.proto
-            paramsProto = self.parseCmdProtoForParams(cmd_proto, options.use_horizontal_m_and_K_for_vertical)
+            (cmd_proto_noparam, paramsProto) = self.parseCmdProtoForParams(cmd_proto, options.use_horizontal_m_and_K_for_vertical)
 
             # Pre-process cmd.proto to add rhessys exec and tecfile path
-            cmd_proto_pre = self.preProcessCmdProto(cmd_proto,
+            cmd_proto_pre = self.preProcessCmdProto(cmd_proto_noparam,
                                                     os.path.join(rhessysExecPath, rhessysExec),
                                                     tecfilePath)
 
             # Check for explicit routing and surface flowtable in cmd_proto, get dicts of
             # flowtables from basedir
-            (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
+            (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto_noparam)
 
             self.logger.debug("DB path: %s" % 
                               RHESSysCalibrator.getDBPath(self.basedir))
