@@ -49,7 +49,6 @@ import re
 from rhessyscalibrator.model_runner_db import *
 from rhessyscalibrator.calibration_runner import *
 from rhessyscalibrator.calibration_parameters import *
-from build.lib.rhessyscalibrator import calibration_parameters
 
 # Constants
 PARALLEL_MODE_LSF = 'lsf'
