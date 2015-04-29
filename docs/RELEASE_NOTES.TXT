@@ -1,3 +1,6 @@
+# 1.0.32 - 4/28/2015
+  - Add support for specifying calibration parameter ranges in cmd.proto.
+
 # 1.0.31 - 4/10/2015
   - Add support for installation via PyPi using pip
   - Add comprehensive manual
