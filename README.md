@@ -113,11 +113,19 @@ your line endings are Unix, not Windows or Mac.
 ## Configuring a calibration session
 RHESSysCalibrator uses a file called *cmd.proto* to control how calibration runs are created.  The typical contents of this file is:
 
-    $rhessys -st 2006 1 1 1 -ed 2013 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2
-    
+    $rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1[0.01, 20.0] $s2[1.0, 150.0] $s3[0.1, 10.0] -sv $sv1[0.01, 20.0] $sv2[1.0, 150.0] -gw $gw1[0.001, 0.3] $gw2[0.01, 0.9]
+
+or for older versions of RHESSysCalibrator (or if you used the *--noparamranges* option when creating your project), the ranges for each parameter will not be included:
+ 
+    $rhessys -st 2003 1 1 1 -ed 2008 10 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2
+
+> Use the *--allparams* option when creating your project to include all possible RHESSys commmand line parameters
+> in the project's *cmd.proto*.
+
 Here we are setting the start and end dates of the calibration runs, as well as setting the soil parameters to calibrated against.  In this case for each model run the following parameters will be varied: decay of saturated hydraulic conductivity for soil drainage (s1 or m in model parlance); saturated hydraulic conductivity for soil drainage (s2 or Ksat0); soil depth (s3); decay of saturated hydraulic conductivity for infiltration (sv1 or m_v); vertical saturated conductivity for infilration (sv2 or Ksat0_v); bypass flow from detention storage directly to hillslope groundwater (gw1); loss from the saturated zone to hillslope groundwater (gw2).
 
-In general, you should only need to change the start and end dates, and which calibration parameters to include.  Ignore all other parts of cmd.proto (e.g. $worldfile) as these will be filled in by RHESSysCalibrator for each model run created.
+In general, you should only need to change the start and end dates, which calibration parameters to include, and
+the range of the uniform distribution from which each parameter will be sampled; parameter ranges are specified by placing the desired closed interval (i.e. two floating point numbers separated by commas and enclosed by square brackets) after the parameter name.  Ignore all other parts of cmd.proto (e.g. $worldfile, $output_path) as these are used by RHESSysCalibrator to create the RHESSys command line for each model run created as part of the calibration session.
     
 When running on compute clusters, we recommend that you also make a test cmd.proto for debugging your model:
 
@@ -125,7 +133,7 @@ When running on compute clusters, we recommend that you also make a test cmd.pro
     
 For example edit cmd.proto.test to run the model for only a single month:
 
-	$rhessys -st 2007 1 1 1 -ed 2007 2 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path -s $s1 $s2 $s3 -sv $sv1 $sv2 -gw $gw1 $gw2
+	$rhessys -st 2007 1 1 1 -ed 2007 2 1 1 -b -t $tecfile -w $worldfile -r $flowtable -pre $output_path $s1[0.01, 20.0] $s2[1.0, 150.0] $s3[0.1, 10.0] -sv $sv1[0.01, 20.0] $sv2[1.0, 150.0] -gw $gw1[0.001, 0.3] $gw2[0.01, 0.9]
 	
 Now save a copy of cmd.proto so that we don't overwrite it when testing our model:
 
