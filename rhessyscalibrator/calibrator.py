@@ -294,6 +294,15 @@ class RHESSysCalibrator(object):
         return cmd_proto
 
     
+    def stripParameterRangesFromCmdProto(self, cmd_proto):
+        """ Strip any parameter ranges (e.g. [0.01, 5.0]) from cmd_proto
+        
+            @param cmd_proto String representing cmd.proto from which parameter ranges are to be stripped
+            @return cmd.proto with any parameter ranges removed.
+        """
+        return re.sub(PARAM_INTERVAL_REGEX, ' ', cmd_proto).strip()
+    
+    
     def parseCmdProtoForParams(self, cmd_proto, s_for_sv=False):
         """ Parses cmd.proto and determines what calibration parameters
             are specified
@@ -340,8 +349,8 @@ class RHESSysCalibrator(object):
         if (paramsProto.svalt1 and not paramsProto.svalt2) or (paramsProto.svalt2 and not paramsProto.svalt1):
             raise Exception("Parameters svalt1 and svalt2 must be supplied if argument -svalt is specified")
         
-        # Strip parameter ranges from cmd.proto
-        cmd_proto_noparam = re.sub(PARAM_INTERVAL_REGEX, ' ', cmd_proto).strip()
+        # Strip any parameter ranges from cmd.proto
+        cmd_proto_noparam = self.stripParameterRangesFromCmdProto(cmd_proto)
         
         return (cmd_proto_noparam, paramsProto)
 

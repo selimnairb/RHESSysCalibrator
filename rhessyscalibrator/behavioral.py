@@ -243,14 +243,17 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                 cmd_proto = fd.read()
                 fd.close()
             
+            # Strip any parameter ranges from cmd.proto
+            cmd_proto_noparam = self.stripParameterRangesFromCmdProto(cmd_proto)
+            
             # Pre-process cmd.proto to add rhessys exec and tecfile path
-            cmd_proto_pre = self.preProcessCmdProto(cmd_proto,
+            cmd_proto_pre = self.preProcessCmdProto(cmd_proto_noparam,
                                                     os.path.join(rhessysExecPath, rhessysExec),
                                                     tecfilePath)
             
             # Check for explicit routing and surface flowtable in cmd_proto, get dicts of
             # flowtables from basedir
-            (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto)
+            (self.flowtablePath, self.surfaceFlowtablePath) = self.determineRouting(cmd_proto_noparam)
             
             # Create behavioral session
             self.session = self.createCalibrationSession(options.user, 
@@ -259,7 +262,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                                                          options.processes,
                                                          self.basedir,
                                                          notes,
-                                                         cmd_proto)
+                                                         cmd_proto_noparam)
             # Get observation file from calibrationSession
             self.session.obs_filename = calibSession.obs_filename
             self.calibratorDB.updateSessionObservationFilename(self.session.id,
