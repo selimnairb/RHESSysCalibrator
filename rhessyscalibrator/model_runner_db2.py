@@ -42,6 +42,7 @@ import shutil
 import errno
 
 from calibration_parameters import CalibrationParameters
+from __builtin__ import None
 
 class ModelRunnerDB2(object):
     """ Class for setting up, and storing modeling session and run
@@ -54,6 +55,7 @@ class ModelRunnerDB2(object):
         post-processing are stored in the postprocess table.
     """
     DB_VERSION = 2.0
+    ELEM_SEP = '|'
     
     @classmethod
     def _createTables(cls, conn):
@@ -646,51 +648,6 @@ WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, i
 
         cursor.close()
 
-    def _runRecordToObject(self, row):
-        """ Translate a record from the "run" table into a ModelRun2
-            object
-
-            @param row sqlite3.Row: row record to be copied into the
-                                  CalibratioRun object
-
-            @return ModelRun2 representing the run record
-        """
-        run = ModelRun2()
-        run.id = row["id"]
-        run.session_id = row["session_id"]
-        run.starttime = datetime.strptime(row["starttime"], 
-                                          "%Y-%m-%d %H:%M:%S")
-        if row["endtime"] != None:
-            run.endtime = datetime.strptime(row["endtime"],
-                                            "%Y-%m-%d %H:%M:%S")
-        run.worldfile = row["worldfile"]
-        run.param_s1 = row["param_s1"]
-        run.param_s2 = row["param_s2"]
-        run.param_s3 = row["param_s3"]
-        run.param_sv1 = row["param_sv1"]
-        run.param_sv2 = row["param_sv2"]
-        run.param_gw1 = row["param_gw1"]
-        run.param_gw2 = row["param_gw2"]
-        run.param_vgsen1 = row["param_vgsen1"]
-        run.param_vgsen2 = row["param_vgsen2"]
-        run.param_vgsen3 = row["param_vgsen3"]
-        run.param_svalt1 = row["param_svalt1"]
-        run.param_svalt2 = row["param_svalt2"]
-        run.cmd_raw = row["cmd_raw"]
-        run.output_path = row["output_path"]
-        run.job_id = row["job_id"]
-        run.status = row["status"]
-        run.nse = row["nse"]
-        run.nse_log = row["nse_log"]
-        run.pbias = row["pbias"]
-        run.rsr = row["rsr"]
-        run.user1 = row["user1"]
-        run.user2 = row["user2"]
-        run.user3 = row["user3"]
-        run.fitness_period = row["fitness_period"]
-
-        return run
-
     def getRun(self, run_id):
         """ Get the run with the supplied ID
 
@@ -736,7 +693,6 @@ WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, i
 
         return runs
 
-
     def getRunInSession(self, session_id, job_id):
         """ Get all runs associated with a session
 
@@ -762,7 +718,46 @@ job_id=?""",
 
         return run
 
+    def getSession(self, session_id):
+        """ Get the session with the supplied ID
 
+            @param session_id Integer representing the ID of the session to fetch from the DB
+
+            @return ModelSession object.  Returns None if the 
+            session_id does not exist
+        """
+        cursor = self._conn.cursor()
+
+        cursor.execute("""SELECT * from session WHERE id=?""", (session_id,))
+        row = cursor.fetchone()
+
+        if row == None:
+            cursor.close()
+            return None
+
+        session = self._sessionRecordToObject(row)
+
+        cursor.close()
+
+        return session
+
+    def getSessions(self):
+        """ Get all sessions in the DB
+
+            @return An array of ModelSession objects
+        """
+        cursor = self._conn.cursor()
+
+        sessions = []
+
+        cursor.execute("""SELECT * from session""")
+        for row in cursor:
+            sessions.append(self._sessionRecordToObject(row))
+
+        cursor.close()
+
+        return sessions
+    
     def _sessionRecordToObject(self, row):
         """ Translate a record from the "session" table into a 
             ModelSession2 object
@@ -787,53 +782,64 @@ job_id=?""",
         session.basedir = row["basedir"]
         session.cmd_proto = row["cmd_proto"]
         session.status = row["status"]
-        session.obs_filename = row["obs_filename"]
 
         return session
 
+    def _runRecordToObject(self, row):
+        """ Translate a record from the "run" table into a ModelRun2
+            object
 
-    def getSession(self, session_id):
-        """ Get the session with the supplied ID
+            @param row sqlite3.Row: row record to be copied into the
+                                  CalibratioRun object
 
-            @param session_id Integer representing the ID of the session to fetch from the DB
-
-            @return ModelSession object.  Returns None if the 
-            session_id does not exist
+            @return ModelRun2 representing the run record
         """
-        cursor = self._conn.cursor()
+        run = ModelRun2()
+        run.id = row["id"]
+        run.session_id = row["session_id"]
+        run.starttime = datetime.strptime(row["starttime"], 
+                                          "%Y-%m-%d %H:%M:%S")
+        if row["endtime"] != None:
+            run.endtime = datetime.strptime(row["endtime"],
+                                            "%Y-%m-%d %H:%M:%S")
+        run.worldfile = row["worldfile"]
+        run.param_s1 = row["param_s1"]
+        run.param_s2 = row["param_s2"]
+        run.param_s3 = row["param_s3"]
+        run.param_sv1 = row["param_sv1"]
+        run.param_sv2 = row["param_sv2"]
+        run.param_gw1 = row["param_gw1"]
+        run.param_gw2 = row["param_gw2"]
+        run.param_vgsen1 = row["param_vgsen1"]
+        run.param_vgsen2 = row["param_vgsen2"]
+        run.param_vgsen3 = row["param_vgsen3"]
+        run.param_svalt1 = row["param_svalt1"]
+        run.param_svalt2 = row["param_svalt2"]
+        run.cmd_raw = row["cmd_raw"]
+        run.output_path = row["output_path"]
+        run.job_id = row["job_id"]
+        run.status = row["status"]
 
-        cursor.execute("""SELECT * from session WHERE id=?""", (session_id,))
-        row = cursor.fetchone()
+        return run
+    
+    def _postprocessRecordToObject(self, row):
+        """ Translate a record from the "postprocess" table into a PostProcess2
+            object
 
-        if row == None:
-            cursor.close()
-            return None
+            @param row sqlite3.Row: row record to be copied into the
+                                  CalibratioRun object
 
-        session = self._sessionRecordToObject(row)
-
-        cursor.close()
-
-        return session
-
-
-    def getSessions(self):
-        """ Get all sessions in the DB
-
-            @return An array of ModelSession objects
+            @return PostProcess2 representing the run record
         """
-        cursor = self._conn.cursor()
-
-        sessions = []
-
-        cursor.execute("""SELECT * from session""")
-        for row in cursor:
-            sessions.append(self._sessionRecordToObject(row))
-
-        cursor.close()
-
-        return sessions
-
-
+        postproc = PostProcess2()
+        postproc.id = row["id"]
+        postproc.session_id = row["session_id"]
+        postproc.obs_filename = row["obs_filename"]
+        postproc.fitness_period = row["fitness_period"]
+        postproc.exclude_date_ranges = row["exclude_date_ranges"].split(self.ELEM_SEP) # TODO: do this for real
+        postproc.obs_runoff_ratio = row["obs_runoff_ratio"]
+        
+        return postproc
 
 class ModelSession2(object):
     """ Class for representing a modeling session record stored within a
@@ -851,11 +857,6 @@ class ModelSession2(object):
         self.basedir = None
         self.cmd_proto = None
         self.status = None
-        self.obs_filename = None
-
-    #def __eq__(self, other):
-    #    if not isinstance(other, ModelSession): raise NotImplementedError
-    #    return self.id == other.id
 
 class ModelRun2(object):
     """ Class for representing a modeling run with a modeling session
@@ -883,14 +884,6 @@ class ModelRun2(object):
         self.output_path = None
         self.job_id = None
         self.status = None
-        self.nse = None
-        self.nse_log = None
-        self.pbias = None
-        self.rsr = None
-        self.user1 = None
-        self.user2 = None
-        self.user3 = None
-        self.fitness_period = None
     
     def setCalibrationParameters(self, params):
         """ Set calibration parameters as supplied by parameter class.
@@ -937,4 +930,46 @@ class ModelRun2(object):
                                        self.param_svalt1, self.param_svalt2)
         return params
 
+class PostProcess2(object):
+    """ Class for representing model session post processing information
+    """
+    def __init__(self):
+        self.id = None
+        self.session_id = None
+        self.obs_filename = None
+        self.fitness_period = None
+        self.exclude_date_ranges = None
+        self.obs_runoff_ratio = None
 
+class PostProcessOption2(object):
+    """ Class for representing arbitrary post processing options
+        as key-value pairs
+    """
+    def __init__(self):
+        self.id = None
+        self.postprocess_id = None
+        self.attr = None
+        self.value = None
+        
+class RunFitness2(object):
+    """ Class for representing model run fitness statistics
+    """
+    def __init__(self):
+        self.id = None
+        self.postprocess_id = None
+        self.run_id = None
+        self.nse = None
+        self.nse_log = None
+        self.pbias = None
+        self.rsr = None
+        self.runoff_ratio = None
+
+class UserFitness2(object):
+    """ Class for representing arbitrary run fitness statistics
+        as key-value pairs
+    """
+    def __init__(self):
+        self.id = None
+        self.runfitness_id = None
+        self.attr = None
+        self.value = None
