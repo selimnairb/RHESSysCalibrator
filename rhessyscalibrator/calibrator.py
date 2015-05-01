@@ -184,7 +184,14 @@ class RHESSysCalibrator(object):
             @return A string representing the path to the DB file relative to basedir's parent
             directory
         """
-        return os.path.join(basedir, "db", "calibration.db")
+        path = os.path.join(basedir, 'db', 'calibration.sqlite')
+        path_old = os.path.join(basedir, 'db', 'calibration.db')
+         
+        if not os.path.exists(path):
+            if os.path.exists(path_old):
+                path = path_old
+        
+        return path 
 
     @classmethod
     def getObsPath(cls, basedir):
