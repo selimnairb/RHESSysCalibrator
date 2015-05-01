@@ -69,9 +69,9 @@ class ModelRunnerDB2(object):
 
     @classmethod
     def _createSessionTable(cls, cursor):
-        cursor.execute("""CREATE TABLE IF NOT EXISTS version
+        cursor.execute("""CREATE TABLE IF NOT EXISTS rhessys_calibrator_version
 (version REAL)""")
-        cursor.execute("""INSERT INTO version (version) VALUES (?)""", (cls.DB_VERSION,))
+        cursor.execute("""INSERT INTO rhessys_calibrator_version (version) VALUES (?)""", (cls.DB_VERSION,))
         
         cursor.execute("""CREATE TABLE IF NOT EXISTS session 
 (id INTEGER PRIMARY KEY ASC,
@@ -269,7 +269,8 @@ VALUES (?,?,?,?,?,?)""",
              
             conn.commit()
             cursor.close()
-            conn.close()        
+            conn.close() 
+            print("Successfully migrated to version {0}".format(cls.DB_VERSION))
                         
         else:
             raise Exception("Database {0} is version {1}, which cannot be migrated by this version of the code".format(db_path, version))
@@ -282,16 +283,26 @@ VALUES (?,?,?,?,?,?)""",
             # Give us access to fields by name
             conn.row_factory = sqlite3.Row 
             cursor = conn.cursor()
-            cursor.execute("""SELECT * FROM version""")
+            cursor.execute("""SELECT * FROM rhessys_calibrator_version""")
             version = cursor.fetchone()[0]
         
         except sqlite3.Error as e:
-            if e.args[0] == "no such table: version":
+            if e.args[0] == "no such table: rhessys_calibrator_version":
                 # See if the DB is empty
                 cursor.execute("""SELECT name FROM sqlite_master WHERE type='table'""")
                 res = cursor.fetchall()
-                if len(res) > 0: 
-                    version = 1.0
+                if len(res) > 0:
+                    session_table_found = False
+                    run_table_found = False
+                    for r in res:
+                        if r[0] == 'session':
+                            session_table_found = True
+                        elif r[0] == 'run':
+                            run_table_found = True
+                    if session_table_found and run_table_found:
+                        version = 1.0
+                    else:
+                        raise Exception("Database {0} does not appear to be a rhessyscalibrator database".format(db_path))
         finally:
             conn.close() 
            
@@ -886,7 +897,7 @@ class ModelRun2(object):
             Parameters not supplied in params will be left set to their
             previous valus (i.e. None if no other assignment has ocurred)
 
-            @param params cluster_parameters.CalibrationParameters
+            @param params calibration_parameters.CalibrationParameters
         """
         if params.s1 != None:
             self.param_s1 = params.s1
@@ -925,4 +936,5 @@ class ModelRun2(object):
                                        self.param_vgsen1, self.param_vgsen2, self.param_vgsen3,
                                        self.param_svalt1, self.param_svalt2)
         return params
+
 
