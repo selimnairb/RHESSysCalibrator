@@ -42,7 +42,6 @@ import shutil
 import errno
 
 from calibration_parameters import CalibrationParameters
-from __builtin__ import None
 
 class ModelRunnerDB2(object):
     """ Class for setting up, and storing modeling session and run
@@ -137,18 +136,17 @@ CHECK (fitness_period="daily" OR fitness_period="weekly" OR fitness_period="mont
 )
 """)
         cursor.execute("""CREATE TABLE IF NOT EXISTS postprocess_option
-(id INTEGER PRIMARY KEY ASC,
-postprocess_id INTEGER NOT NULL REFERENCES postprocess (id) ON DELETE CASCADE,
-attr TEXT,
-value TEXT
-)
-""")
+(postprocess_id INTEGER NOT NULL REFERENCES postprocess (id) ON DELETE CASCADE,
+attr TEXT NOT NULL,
+value TEXT,
+PRIMARY KEY (postprocess_id, attr)
+)""")
         # Create indices
         cursor.execute("""CREATE INDEX IF NOT EXISTS postproc_sess_idx ON 
 postprocess (session_id)""")
-        cursor.execute("""CREATE INDEX IF NOT EXISTS postproc_opt_idx ON 
+        cursor.execute("""CREATE INDEX IF NOT EXISTS postprocopt_idx ON 
 postprocess_option (postprocess_id)""")
-    
+            
     @classmethod
     def _createRunfitnessTable(cls, cursor):
         cursor.execute("""CREATE TABLE IF NOT EXISTS runfitness
@@ -179,14 +177,13 @@ runfitness (rsr)""")
     @classmethod
     def _createUserfitnessTable(cls, cursor):
         cursor.execute("""CREATE TABLE IF NOT EXISTS userfitness
-(id INTEGER PRIMARY KEY ASC,
-runfitness_id INTEGER NOT NULL REFERENCES runfitness (id) ON DELETE CASCADE,
-attr TEXT,
-value TEXT
+(runfitness_id INTEGER NOT NULL REFERENCES runfitness (id) ON DELETE CASCADE,
+attr TEXT NOT NULL,
+value REAL,
+PRIMARY KEY (runfitness_id, attr)
 )
 """)
-        # Create indices on userfitness table
-        cursor.execute("""CREATE INDEX IF NOT EXISTS userfit_runfit_idx ON 
+        cursor.execute("""CREATE INDEX IF NOT EXISTS userfitness_idx ON 
 userfitness (runfitness_id)""")
     
     @classmethod
@@ -758,6 +755,62 @@ job_id=?""",
 
         return sessions
     
+    def getPostProcessForSession(self, session_id):
+        """ Get the post process entries associated with a session
+
+            @param session_id Integer representing the ID of the session whose post process entries 
+            are to be fetch from the DB
+
+            @return List of PostProcess2 objects.  Returns empty list if the 
+            session_id does not exist
+        """
+        cursor = self._conn.cursor()
+        sub_cursor = self._conn.cursor()
+
+        postprocesses = []
+
+        cursor.execute("""SELECT * FROM postprocess WHERE session_id=?""", (session_id,))
+        for row in cursor:
+            # Get postprocess_option entries for this postprocess entry
+            opts = {}
+            sub_cursor.execute("""SELECT attr, value FROM postprocess_option WHERE postprocess_id=?""", (row['id'],))
+            for opt_row in sub_cursor:
+                opts[opt_row['attr']] = opt_row['value']
+            postprocesses.append(self._postprocessRecordToObject(row, opts))
+
+        sub_cursor.close()
+        cursor.close()
+
+        return postprocesses
+    
+    def getRunFitnessForPostProcess(self, postprocess_id):
+        """ Get the run fitness entries associated with a post process entry
+
+            @param postprocess_id Integer representing the ID of the post process entry whose 
+            run fitness entries are to be fetch from the DB
+
+            @return List of RunFitness2 objects.  Returns empty list if the 
+            postprocess_id does not exist
+        """
+        cursor = self._conn.cursor()
+        sub_cursor = self._conn.cursor()
+
+        runfitness = []
+
+        cursor.execute("""SELECT * FROM runfitness WHERE postprocess_id=?""", (postprocess_id,))
+        for row in cursor:
+            # Get userfitness entries for this runfitness entry
+            userfitness = {}
+            sub_cursor.execute("""SELECT attr, value FROM userfitness WHERE runfitness_id=?""", (row['id'],))
+            for opt_row in sub_cursor:
+                userfitness[opt_row['attr']] = opt_row['value']
+            runfitness.append(self._runfitnessRecordToObject(row, userfitness))
+
+        sub_cursor.close()
+        cursor.close()
+
+        return runfitness
+    
     def _sessionRecordToObject(self, row):
         """ Translate a record from the "session" table into a 
             ModelSession2 object
@@ -822,12 +875,13 @@ job_id=?""",
 
         return run
     
-    def _postprocessRecordToObject(self, row):
+    def _postprocessRecordToObject(self, row, options=None):
         """ Translate a record from the "postprocess" table into a PostProcess2
             object
 
             @param row sqlite3.Row: row record to be copied into the
-                                  CalibratioRun object
+                                  PostProcess2 object
+            @param options dict representing postprocess_option entries for this postprocess entry
 
             @return PostProcess2 representing the run record
         """
@@ -836,10 +890,41 @@ job_id=?""",
         postproc.session_id = row["session_id"]
         postproc.obs_filename = row["obs_filename"]
         postproc.fitness_period = row["fitness_period"]
-        postproc.exclude_date_ranges = row["exclude_date_ranges"].split(self.ELEM_SEP) # TODO: do this for real
+        if row["exclude_date_ranges"]:
+            postproc.exclude_date_ranges = row["exclude_date_ranges"].split(self.ELEM_SEP) # TODO: do this for real
         postproc.obs_runoff_ratio = row["obs_runoff_ratio"]
+        if not options:
+            postproc.options = {}
+        else:
+            postproc.options = options
         
         return postproc
+    
+    def _runfitnessRecordToObject(self, row, userfitness=None):
+        """ Translate a record from the "runfitness" table into a RunFitness2
+            object
+
+            @param row sqlite3.Row: row record to be copied into the
+                                  RunFitness2 object
+            @param options dict representing userfitness entries for this runfitness entry
+
+            @return RunFitness2 representing the run record
+        """
+        runfitness = RunFitness2()
+        runfitness.id = row["id"]
+        runfitness.postprocess_id = row["postprocess_id"]
+        runfitness.run_id = row["run_id"]
+        runfitness.nse = row["nse"]
+        runfitness.nse_log = row["nse_log"]
+        runfitness.pbias = row["pbias"]
+        runfitness.rsr = row["rsr"]
+        runfitness.runoff_ratio = row["runoff_ratio"]
+        if not userfitness:
+            runfitness.userfitness = {}
+        else:
+            runfitness.userfitness = userfitness
+            
+        return runfitness
 
 class ModelSession2(object):
     """ Class for representing a modeling session record stored within a
@@ -940,6 +1025,7 @@ class PostProcess2(object):
         self.fitness_period = None
         self.exclude_date_ranges = None
         self.obs_runoff_ratio = None
+        self.options = None
 
 class PostProcessOption2(object):
     """ Class for representing arbitrary post processing options
@@ -963,6 +1049,7 @@ class RunFitness2(object):
         self.pbias = None
         self.rsr = None
         self.runoff_ratio = None
+        self.userfitness = None
 
 class UserFitness2(object):
     """ Class for representing arbitrary run fitness statistics
