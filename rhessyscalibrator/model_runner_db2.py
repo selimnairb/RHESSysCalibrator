@@ -711,8 +711,13 @@ VALUES (?,?,?,?,?,?,?)""", (postprocess_id, run_id, nse, nse_log, pbias, rsr, ru
         """ Get all runs associated with a session
 
             @param session_id Integer representing the session whose list of runs we want
+            @param where_clause String representing SQLite3 where clause used to restrict
+            runs returned.
 
-            @return An array of ModelRun objects
+            @note This method does not scrub the where_clause of dangerous elements. 
+            Use at your own risk.
+
+            @return An array of ModelRun2 objects
         """
         cursor = self._conn.cursor()
         runs = []
@@ -879,6 +884,49 @@ job_id=?""",
 
         return runfitness
     
+    def getRunsInPostProcess(self, postprocess_id, where_clause=None):
+        """ Get all runs, and their runfitness data, associated with post process entry
+
+            @param postprocess_id Integer representing the post process entry whose list of runs 
+            we want
+            @param where_clause String representing SQLite3 where clause used to restrict
+            runfitness records returned.
+
+            @note This method does not scrub the where_clause of dangerous elements. 
+            Use at your own risk.
+
+            @return An array of ModelRun objects
+        """
+        cursor = self._conn.cursor()
+        sub_cursor = self._conn.cursor()
+        
+        runs = []
+        
+        queryProto = "SELECT * FROM runfitness WHERE postprocess_id=?"
+        if where_clause:
+            queryProto += " AND " + where_clause
+            
+        cursor.execute(queryProto, (postprocess_id,))
+        for row in cursor:
+            # Get userfitness entries for this runfitness entry
+            userfitness = None
+            sub_cursor.execute("""SELECT attr, value FROM userfitness WHERE runfitness_id=?""", (row['id'],))
+            for opt_row in sub_cursor:
+                if userfitness is None:
+                    userfitness = {}
+                userfitness[opt_row['attr']] = opt_row['value']
+            run_fitness = self._runfitnessRecordToObject(row, userfitness)
+            
+            # Get the actual run
+            sub_cursor.execute("""SELECT * FROM run WHERE id=?""", (row['run_id'],))
+            print row['run_id']
+            run_row = sub_cursor.fetchone()
+            assert(run_row != None)
+            run = self._runRecordToObject(run_row, run_fitness)
+            runs.append(run)
+        
+        return runs
+    
     def _sessionRecordToObject(self, row):
         """ Translate a record from the "session" table into a 
             ModelSession2 object
@@ -906,12 +954,13 @@ job_id=?""",
 
         return session
 
-    def _runRecordToObject(self, row):
+    def _runRecordToObject(self, row, run_fitness=None):
         """ Translate a record from the "run" table into a ModelRun2
             object
 
             @param row sqlite3.Row: row record to be copied into the
                                   CalibratioRun object
+            @param run_fitness ModelRunFitness2 object associated with this run
 
             @return ModelRun2 representing the run record
         """
@@ -940,6 +989,7 @@ job_id=?""",
         run.output_path = row["output_path"]
         run.job_id = row["job_id"]
         run.status = row["status"]
+        run.run_fitness = run_fitness
 
         return run
     
@@ -1037,6 +1087,7 @@ class ModelRun2(object):
         self.output_path = None
         self.job_id = None
         self.status = None
+        self.run_fitness = None
     
     def setCalibrationParameters(self, params):
         """ Set calibration parameters as supplied by parameter class.

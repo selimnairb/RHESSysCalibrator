@@ -214,6 +214,56 @@ class TestClusterCalibrator(unittest.TestCase):
  
         # Test getRunInSession
         run = db.getRunInSession(insertedSessionID, 12346)
+        
+        # Test getRunsInPostProcess
+        runs = db.getRunsInPostProcess(postProcID)
+        self.assertTrue(len(runs) == 1)
+        fetchedRun = runs[0]
+        fetchedRun.starttime.strftime("%Y-%m-%d %H:%M:%S")
+        if fetchedRun.endtime != None:
+            fetchedRun.endtime.strftime("%Y-%m-%d %H:%M:%S")
+        self.assertEqual(fetchedRun.worldfile, "worldfile1")
+        self.assertEqual(fetchedRun.param_s1, 0.11)
+        self.assertEqual(fetchedRun.param_s2, 0.12)
+        self.assertEqual(fetchedRun.param_s3, 0.13)
+        self.assertEqual(fetchedRun.param_sv1, 0.21)
+        self.assertEqual(fetchedRun.param_sv2, 0.22)
+        self.assertEqual(fetchedRun.param_gw1, 0.31)
+        self.assertEqual(fetchedRun.param_gw2, 0.32)
+        self.assertEqual(fetchedRun.param_vgsen1, 0.41)
+        self.assertEqual(fetchedRun.param_vgsen2, 0.42)
+        self.assertEqual(fetchedRun.param_vgsen3, 0.43)
+        self.assertEqual(fetchedRun.cmd_raw, "rhessys -w worldfile1 ..")
+        self.assertEqual(fetchedRun.output_path, "run_12345_worlfile1")
+        self.assertEqual(fetchedRun.job_id, '12345')
+        self.assertEqual(fetchedRun.status, "DONE")
+        self.assertEqual(fetchedRun.run_fitness.nse, 1.0)
+        self.assertEqual(fetchedRun.run_fitness.nse_log, 0.9)
+        
+        # Test getRunInSession with where clause
+        runs = db.getRunsInPostProcess(postProcID, where_clause='nse > 0.5 AND nse_log > 0.5')
+        self.assertTrue(len(runs) == 1)
+        fetchedRun = runs[0]
+        fetchedRun.starttime.strftime("%Y-%m-%d %H:%M:%S")
+        if fetchedRun.endtime != None:
+            fetchedRun.endtime.strftime("%Y-%m-%d %H:%M:%S")
+        self.assertEqual(fetchedRun.worldfile, "worldfile1")
+        self.assertEqual(fetchedRun.param_s1, 0.11)
+        self.assertEqual(fetchedRun.param_s2, 0.12)
+        self.assertEqual(fetchedRun.param_s3, 0.13)
+        self.assertEqual(fetchedRun.param_sv1, 0.21)
+        self.assertEqual(fetchedRun.param_sv2, 0.22)
+        self.assertEqual(fetchedRun.param_gw1, 0.31)
+        self.assertEqual(fetchedRun.param_gw2, 0.32)
+        self.assertEqual(fetchedRun.param_vgsen1, 0.41)
+        self.assertEqual(fetchedRun.param_vgsen2, 0.42)
+        self.assertEqual(fetchedRun.param_vgsen3, 0.43)
+        self.assertEqual(fetchedRun.cmd_raw, "rhessys -w worldfile1 ..")
+        self.assertEqual(fetchedRun.output_path, "run_12345_worlfile1")
+        self.assertEqual(fetchedRun.job_id, '12345')
+        self.assertEqual(fetchedRun.status, "DONE")
+        self.assertEqual(fetchedRun.run_fitness.nse, 1.0)
+        self.assertEqual(fetchedRun.run_fitness.nse_log, 0.9)
  
         self.assertFalse(run == None)
 
