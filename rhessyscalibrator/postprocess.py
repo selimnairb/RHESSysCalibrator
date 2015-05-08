@@ -55,7 +55,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from rhessysworkflows.rhessys import RHESSysOutput
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
-from rhessyscalibrator.model_runner_db import *
+from rhessyscalibrator.model_runner_db2 import *
 
 
 class RHESSysCalibratorPostprocess(object):
@@ -812,10 +812,6 @@ Run "%prog --help" for detailed description of all options
         parser.add_option("-s", "--session", action="store", type="int",
                           dest="session_id",
                           help="[REQUIRED] the ID of the session for which model fitness statistics should be calculated")
-
-        parser.add_option("-r", "--recalculate", action="store_true", 
-                          dest="recalculate", 
-                          help="[OPTIONAL] force recalculation of fitness statistics for each run in the session (will overwrite any existing.)")
         
         parser.add_option("--add_streamflow_and_gw", action="store_true",
                           dest="add_streamflow_and_gw",
@@ -964,7 +960,7 @@ Run "%prog --help" for detailed description of all options
 
         try:
             calibratorDB = \
-                ModelRunnerDB(RHESSysCalibrator.getDBPath(
+                ModelRunnerDB2(RHESSysCalibrator.getDBPath(
                     basedir))
             
             # Make sure the session exists
@@ -975,15 +971,6 @@ Run "%prog --help" for detailed description of all options
                 print "WARNING: session status is: %s.  Some model runs may not have completed." % (session.status,)
             else:
                 self.logger.debug("Session status is: %s" % (session.status,))
-            
-            # Check to see if results have already been calculated, only
-            #  continue if "force" option was specified
-            if session.obs_filename != None:
-                if options.recalculate:
-                    print "Overwriting existing fitness statistics for session %d" % session.id
-                else:
-                    print "Existing fitness statistics found for session %d.\nUse --recalculate option to overwrite existing statistics" % session.id
-                    return 0
                 
             # Get runs in session
             runs = calibratorDB.getRunsInSession(session.id)
@@ -992,9 +979,18 @@ Run "%prog --help" for detailed description of all options
                 raise Exception("No runs found for session %d" 
                                 % (session.id,))
 
+            # Create postprocess entry placeholder
+            postprocID = None
+
             runsProcessed = False
             for run in runs:
                 if "DONE" == run.status:
+                    if postprocID is None:
+                        # Create postprocess entry to store all run fitness data in ...
+                        postprocID = calibratorDB.insertPostProcess(session.id,
+                                                                    options.observed_file,
+                                                                    options.period)
+                        
                     runOutput = os.path.join(rhessysPath, run.output_path)
                     self.logger.debug(">>>\nOutput dir of run %d is %s" %
                                          (run.id, runOutput))
@@ -1054,11 +1050,6 @@ Run "%prog --help" for detailed description of all options
                         model_datetime[modelEndIdx]
                     except IndexError:
                         print("Length of time series for runid: %d differs from what is expected. Output dir: %s\n\nSkipping..." % (run.id, runOutput))
-                        # Invalidate fitness parameters for this run
-                        calibratorDB.updateRunFitnessResults(run.id,
-                                                             None,
-                                                             None,
-                                                             None)
                         continue
                     
                     self.logger.debug("Runid: %d" % (run.id,) )    
@@ -1105,8 +1096,8 @@ Run "%prog --help" for detailed description of all options
                                       (run.id, my_nse, my_nse_log))
                     
                     # Store fitness parameters for this run
-                    calibratorDB.updateRunFitnessResults(run.id,
-                                                         options.period,
+                    calibratorDB.insertRunFitnessResults(postprocID,
+                                                         run.id,
                                                          my_nse,
                                                          my_nse_log)
                     
@@ -1116,11 +1107,6 @@ Run "%prog --help" for detailed description of all options
                     runsProcessed = True
 
             if runsProcessed:
-                # Update session with observed file name
-                # options.observed_file
-                calibratorDB.updateSessionObservationFilename(session.id,
-                                                              options.observed_file)
-                
                 # Generate and save dotty plot
                 dottyFilename = "dotty_plots_SESSION_%s_%s" % ( options.session_id, options.period )
                 self.saveDottyPlot(outdirPath, dottyFilename, format='PDF', 
@@ -1131,7 +1117,7 @@ Run "%prog --help" for detailed description of all options
                 self.saveCovariancePlot(outdirPath, covFilename, format='PDF', 
                                         sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
                 
-               
+                print("\n\nFitness results saved to process session: {0}".format(postprocID))
         except:
             raise
         else:
