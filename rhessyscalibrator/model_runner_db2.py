@@ -601,8 +601,8 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
         cursor.close()
 
     def insertPostProcess(self, session_id, 
-                          obs_filename, fitness_period, exclude_date_ranges,
-                          obs_runoff_ratio,
+                          obs_filename, fitness_period, exclude_date_ranges=None,
+                          obs_runoff_ratio=None,
                           options=None):
         """ Creates post process entry for a particular session
 
