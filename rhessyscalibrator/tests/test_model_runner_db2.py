@@ -115,11 +115,13 @@ class TestClusterCalibrator(unittest.TestCase):
         runStatus_final = db.getRunStatus(insertedRunID)
         self.assertNotEqual(runStatus_post, runStatus_final)
  
-        db.insertPostProcess(insertedSessionID, "obsfile.csv", 
-                             "daily", None, 0.25, {'foo': 'bar'})
+        retPostProcID = db.insertPostProcess(insertedSessionID, "obsfile.csv", 
+                                          "daily", None, 0.25, {'foo': 'bar'})
         insertedPostproc = db.getPostProcessForSession(insertedSessionID)
         postproc = insertedPostproc[0]
         postProcID = postproc.id
+        self.assertEqual(retPostProcID, postProcID)
+        
         self.assertEqual(postproc.session_id, insertedSessionID)
         self.assertEqual(postproc.obs_filename, "obsfile.csv")
         self.assertEqual(postproc.fitness_period, "daily")
@@ -135,7 +137,7 @@ class TestClusterCalibrator(unittest.TestCase):
         self.assertEqual(postproc.obs_runoff_ratio, postproc2.obs_runoff_ratio)
         self.assertEqual(postproc.options['foo'], postproc2.options['foo'])
  
-        db.insertRunFitnessResults(postProcID, insertedRunID, 1.0, 0.9)
+        retRunfitID = db.insertRunFitnessResults(postProcID, insertedRunID, 1.0, 0.9)
  
         # Test fetching a stored run
         fetchedRun = db.getRun(insertedRunID)
@@ -165,6 +167,7 @@ class TestClusterCalibrator(unittest.TestCase):
         runfit = db.getRunFitnessForPostProcess(postProcID)
         self.assertEqual(len(runfit), 1)
         runfit = runfit[0]
+        self.assertEqual(runfit.id, retRunfitID)
         self.assertEqual(runfit.nse, 1.0)
         self.assertEqual(runfit.nse_log, 0.9)
         self.assertEqual(runfit.rsr, None)

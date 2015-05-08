@@ -616,28 +616,31 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
             from fitness calculations
             @param obs_runoff_ratio Float representing runoff / precipitation for observed data
             @param options Dict<String, String> representing user-defined post process options 
+            
+            @return ID of post process entry created.
         """
         cursor = self._conn.cursor()
         
         cursor.execute("""INSERT INTO postprocess
 (session_id,obs_filename,fitness_period,exclude_date_ranges,obs_runoff_ratio)
 VALUES (?,?,?,?,?)""", (session_id,obs_filename,fitness_period,exclude_date_ranges,obs_runoff_ratio))
-
-        self._conn.commit()
+        
+        # Get the rowid just inserted
+        cursor.execute("""SELECT LAST_INSERT_ROWID() FROM postprocess LIMIT 1""")
+        postprocess_id = cursor.fetchone()[0]
         
         # Set post process options (if necessary)
         if options:
-            # Get the rowid just inserted
-            cursor.execute("""SELECT LAST_INSERT_ROWID() FROM postprocess LIMIT 1""")
-            postprocess_id = cursor.fetchone()[0]
-            
             for (attr, value) in options.iteritems():
                 cursor.execute("""INSERT INTO postprocess_option
 (postprocess_id,attr,value) VALUES (?,?,?)""", (postprocess_id, attr, value))
                 
             self._conn.commit()        
 
+        self._conn.commit()
         cursor.close()
+        
+        return postprocess_id
     
     def insertRunFitnessResults(self, postprocess_id, run_id, 
                                 nse=None, nse_log=None, 
@@ -657,6 +660,8 @@ VALUES (?,?,?,?,?)""", (session_id,obs_filename,fitness_period,exclude_date_rang
             @param runoff_ratio Float representing runoff / precipitation for the model run output
             @param userfitness Dict<String, Float> representing user-defined fitness parameters 
             for the run. 
+            
+            @return ID of run fitness entry created.
         """
         cursor = self._conn.cursor()
         
@@ -664,21 +669,20 @@ VALUES (?,?,?,?,?)""", (session_id,obs_filename,fitness_period,exclude_date_rang
 (postprocess_id,run_id,nse,nse_log,pbias,rsr,runoff_ratio)
 VALUES (?,?,?,?,?,?,?)""", (postprocess_id, run_id, nse, nse_log, pbias, rsr, runoff_ratio))
 
-        self._conn.commit()
+        # Get the rowid just inserted
+        cursor.execute("""SELECT LAST_INSERT_ROWID() FROM runfitness LIMIT 1""")
+        runfitness_id = cursor.fetchone()[0]
         
         # Set userfitness options for this run (if necessary)
         if userfitness:
-            # Get the rowid just inserted
-            cursor.execute("""SELECT LAST_INSERT_ROWID() FROM runfitness LIMIT 1""")
-            runfitness_id = cursor.fetchone()[0]
-            
             for (attr, value) in userfitness.iteritems():
                 cursor.execute("""INSERT INTO userfitness
 (runfitness_id,attr,value) VALUES (?,?,?)""", (runfitness_id, attr, value))
                 
-            self._conn.commit()        
-
+        self._conn.commit()
         cursor.close()
+        
+        return runfitness_id
 
     def getRun(self, run_id):
         """ Get the run with the supplied ID
