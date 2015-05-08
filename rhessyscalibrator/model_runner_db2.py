@@ -384,12 +384,10 @@ VALUES (?,?,?,?,?,?,?,?)""",
 
         # Get the rowid just inserted
         cursor.execute("""SELECT LAST_INSERT_ROWID() from session""")
-        #self.__mostRecentSessionID = cursor.fetchone()[0]
         mostRecentSessionID = cursor.fetchone()[0]
 
         cursor.close()
 
-        #return self.__mostRecentSessionID
         return mostRecentSessionID
 
     def updateSessionEndtime(self, id, endtime, status):
@@ -409,23 +407,23 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
 
         cursor.close()
 
-    def updateSessionObservationFilename(self, id, obs_filename):
-        """ Updates the obs_filename used for calculating model
-            fitness statistics for runs associated with the session
-
-            @param id Integer representing the ID of the session to update
-            @param obs_filename String representing the name of the observation file
-                                    used to calculate fitness statistics
-                                    for model runs
-        """
-        cursor = self._conn.cursor()
-
-        cursor.execute("""UPDATE session SET obs_filename=? WHERE id=?""", 
-                       (obs_filename, id))
-
-        self._conn.commit()
-
-        cursor.close()
+#     def updateSessionObservationFilename(self, id, obs_filename):
+#         """ Updates the obs_filename used for calculating model
+#             fitness statistics for runs associated with the session
+# 
+#             @param id Integer representing the ID of the session to update
+#             @param obs_filename String representing the name of the observation file
+#                                     used to calculate fitness statistics
+#                                     for model runs
+#         """
+#         cursor = self._conn.cursor()
+# 
+#         cursor.execute("""UPDATE session SET obs_filename=? WHERE id=?""", 
+#                        (obs_filename, id))
+# 
+#         self._conn.commit()
+# 
+#         cursor.close()
 
     def getMostRecentRunID(self, session_id):
         """ Returns the ID of the run most recently inserted by the given
@@ -618,30 +616,83 @@ id=?""", (endtime.strftime("%Y-%m-%d %H:%M:%S"), status, id))
 
         cursor.close()
 
-    def updateRunFitnessResults(self, id, fitness_period, nse, nse_log, 
-                                pbias=None, rsr=None,
-                                user1=None, user2=None, user3=None):
-        """ Updates fitness results of a model run
+    def insertPostProcess(self, session_id, 
+                          obs_filename, fitness_period, exclude_date_ranges,
+                          obs_runoff_ratio,
+                          options=None):
+        """ Creates post process entry for a particular session
 
-            @param id Integer representing The ID of the run to update
+            @param session_id Integer representing the ID of the session for which to create
+            a post process entry
+            @param obs_filename String representing the name of the observation file
+            used to calculate fitness statistics for model runs
             @param fitness_period String indicating time step over which 
-                                      all fitness results were calculated.
-                                      One of: daily, monthly, yearly
-            @param nse Double: Nash-Sutcliffe efficiency
-            @param nse_log Double: Nash-Sutcliffe efficiency (log)
-            @param pbias Double: Percent bias
-            @param rsr Double: RMSE / STDEV_obs
-            @param user1 Double: User-defined run fitness result 
-            @param user2 Double: User-defined run fitness result 
-            @param user3 Double: User-defined run fitness result 
+            all fitness results were calculated. One of: daily, monthly, yearly
+            @param exclude_date_ranges List of tuples of dates representing data to be exluded
+            from fitness calculations
+            @param obs_runoff_ratio Float representing runoff / precipitation for observed data
+            @param options Dict<String, String> representing user-defined post process options 
         """
         cursor = self._conn.cursor()
         
-        cursor.execute("""UPDATE run SET 
-nse=?, nse_log=?, pbias=?, rsr=?, user1=?, user2=?, user3=?, fitness_period=?
-WHERE id=?""", (nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period, id))
+        cursor.execute("""INSERT INTO postprocess
+(session_id,obs_filename,fitness_period,exclude_date_ranges,obs_runoff_ratio)
+VALUES (?,?,?,?,?)""", (session_id,obs_filename,fitness_period,exclude_date_ranges,obs_runoff_ratio))
 
         self._conn.commit()
+        
+        # Set post process options (if necessary)
+        if options:
+            # Get the rowid just inserted
+            cursor.execute("""SELECT LAST_INSERT_ROWID() FROM postprocess LIMIT 1""")
+            postprocess_id = cursor.fetchone()[0]
+            
+            for (attr, value) in postprocess_id.iteritems():
+                cursor.execute("""INSERT INTO postprocess
+(postprocess_id,attr,value) VALUES (?,?,?)""", (postprocess_id, attr, value))
+                
+            self._conn.commit()        
+
+        cursor.close()
+    
+    def insertRunFitnessResults(self, postprocess_id, run_id, 
+                                nse=None, nse_log=None, 
+                                pbias=None, rsr=None,
+                                runoff_ratio=None,
+                                userfitness=None):
+        """ Set fitness results of a model run for a particular post process entry
+
+            @param postprocess_id Integer representing The ID of the post process entry
+            @param run_id Integer representing The ID of the run whose fitness results are to be update
+            @param fitness_period String indicating time step over which 
+            all fitness results were calculated.  One of: daily, monthly, yearly
+            @param nse Double: Nash-Sutcliffe efficiency of streamflow
+            @param nse_log Double: Nash-Sutcliffe efficiency log(streamflow)
+            @param pbias Double: Percent bias
+            @param rsr Double: RMSE / STDEV_obs
+            @param runoff_ratio Float representing runoff / precipitation for the model run output
+            @param userfitness Dict<String, Float> representing user-defined fitness parameters 
+            for the run. 
+        """
+        cursor = self._conn.cursor()
+        
+        cursor.execute("""INSERT INTO runfitness
+(postprocess_id,run_id,nse,nse_log,pbias,rsr,runoff_ratio)
+VALUES (?,?,?,?,?,?,?)""", (postprocess_id, run_id, nse, nse_log, pbias, rsr, runoff_ratio))
+
+        self._conn.commit()
+        
+        # Set userfitness options for this run (if necessary)
+        if userfitness:
+            # Get the rowid just inserted
+            cursor.execute("""SELECT LAST_INSERT_ROWID() FROM runfitness LIMIT 1""")
+            runfitness_id = cursor.fetchone()[0]
+            
+            for (attr, value) in userfitness.iteritems():
+                cursor.execute("""INSERT INTO userfitness
+(runfitness_id,attr,value) VALUES (?,?,?)""", (runfitness_id, attr, value))
+                
+            self._conn.commit()        
 
         cursor.close()
 
@@ -760,9 +811,9 @@ job_id=?""",
 
             @param session_id Integer representing the ID of the session whose post process entries 
             are to be fetch from the DB
-
-            @return List of PostProcess2 objects.  Returns empty list if the 
-            session_id does not exist
+   
+            @return Return a list of PostProcess2 objects; Return an empty list if the session_id 
+            does not exist.
         """
         cursor = self._conn.cursor()
         sub_cursor = self._conn.cursor()
@@ -777,6 +828,35 @@ job_id=?""",
             for opt_row in sub_cursor:
                 opts[opt_row['attr']] = opt_row['value']
             postprocesses.append(self._postprocessRecordToObject(row, opts))
+
+        sub_cursor.close()
+        cursor.close()
+
+        return postprocesses
+    
+    def getPostProcess(self, postprocess_id):
+        """ Get the post process entries associated with a session
+
+            @param postprocess_id Integer representing The ID of the post process entry            
+
+            @return Return PostProcess2 or None if the post process with id  
+            does not exist.
+        """
+        cursor = self._conn.cursor()
+        sub_cursor = self._conn.cursor()
+
+        postprocesses = None
+
+        cursor.execute("""SELECT * FROM postprocess WHERE id=?""", (postprocess_id,))
+        row = cursor.fetchone()
+        
+        if row != None:
+            # Get postprocess_option entries for this postprocess entry
+            opts = {}
+            sub_cursor.execute("""SELECT attr, value FROM postprocess_option WHERE postprocess_id=?""", (row['id'],))
+            for opt_row in sub_cursor:
+                opts[opt_row['attr']] = opt_row['value']
+            postprocesses = self._postprocessRecordToObject(row, opts)
 
         sub_cursor.close()
         cursor.close()
