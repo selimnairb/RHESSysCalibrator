@@ -454,11 +454,7 @@ WHERE session_id=?""", (session_id,))
                   param_vgsen1, param_vgsen2, param_vgsen3,
                   param_svalt1, param_svalt2,
                   cmd_raw, output_path,
-                  job_id,
-                  fitness_period=None,
-                  nse=None, nse_log=None, 
-                  pbias=None, rsr=None,
-                  user1=None, user2=None, user3=None):
+                  job_id):
         """ Creates a new run with a starttime of the current time,
             and a status of 'PEND'.  Note: you must specify as null (None)
             any of the param_* arguments that are no used in the run.
@@ -493,16 +489,6 @@ WHERE session_id=?""", (session_id,))
             @param output_path String representing the dir where results for this run are 
                                      stored
             @param job_id String representing the job ID associated with this run
-            @param fitness_period String indicating time step over which 
-                                      all fitness results were calculated.
-                                      One of: daily, monthly, yearly
-            @param nse Double: Nash-Sutcliffe efficiency
-            @param nse_log Double: Nash-Sutcliffe efficiency (log)
-            @param pbias Double: Percent bias
-            @param rsr Double: RMSE / STDEV_obs
-            @param user1 Double: User-defined run fitness result 
-            @param user2 Double: User-defined run fitness result 
-            @param user3 Double: User-defined run fitness result 
 
             @return The ID of the run created
         """
@@ -517,9 +503,8 @@ param_gw1,param_gw2,
 param_vgsen1,param_vgsen2,param_vgsen3,
 param_svalt1,param_svalt2,
 cmd_raw,output_path,
-job_id,status,
-nse,nse_log,pbias,rsr,user1,user2,user3,fitness_period)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", 
+job_id,status)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", 
                        (session_id, worldfile,
                         param_s1, param_s2, param_s3,
                         param_sv1, param_sv2,
@@ -527,8 +512,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         param_vgsen1, param_vgsen2, param_vgsen3,
                         param_svalt1, param_svalt2,
                         cmd_raw, output_path,
-                        job_id, "PEND",
-                        nse, nse_log, pbias, rsr, user1, user2, user3, fitness_period))
+                        job_id, "PEND"))
 
         self._conn.commit()
 
@@ -647,8 +631,8 @@ VALUES (?,?,?,?,?)""", (session_id,obs_filename,fitness_period,exclude_date_rang
             cursor.execute("""SELECT LAST_INSERT_ROWID() FROM postprocess LIMIT 1""")
             postprocess_id = cursor.fetchone()[0]
             
-            for (attr, value) in postprocess_id.iteritems():
-                cursor.execute("""INSERT INTO postprocess
+            for (attr, value) in options.iteritems():
+                cursor.execute("""INSERT INTO postprocess_option
 (postprocess_id,attr,value) VALUES (?,?,?)""", (postprocess_id, attr, value))
                 
             self._conn.commit()        
