@@ -897,10 +897,11 @@ Run "%prog --help" for detailed description of all options
         rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
 
         # Read observed data from file
-        obsFile = open(obsFilePath, 'r')
-        (obs_datetime, obs_data) = \
-            RHESSysOutput.readObservedDataFromFile(obsFile, logger=self.logger)
-        obsFile.close()
+#         obsFile = open(obsFilePath, 'r')
+#         (obs_datetime, obs_data) = \
+#             RHESSysOutput.readObservedDataFromFile(obsFile, logger=self.logger)
+#         obsFile.close()
+        obs_all = pd.read_csv(obsFilePath, index_col=0, parse_dates=True)
 
         startDate = None
         endDate = None
@@ -912,7 +913,8 @@ Run "%prog --help" for detailed description of all options
                                  options.startdate[3])
         else:
             # Set start data based on observed data
-            startDate = obs_datetime[0]
+            #startDate = obs_datetime[0]
+            startDate = obs_all.index[0].to_datetime()
             
         if options.enddate:
             # Set end date based on command line
@@ -925,7 +927,8 @@ Run "%prog --help" for detailed description of all options
                          (str(endDate), str(startDate) ) )
         else:
             # Set end date based on observed data
-            endDate = obs_datetime[-1]
+            #endDate = obs_datetime[-1]
+            endDate = obs_all.index[-1].to_datetime()
 
         # Determine start and end indices
         delta = endDate - startDate
@@ -933,7 +936,7 @@ Run "%prog --help" for detailed description of all options
             
         obsStartIdx = None
         obsEndIdx = None
-        for (counter, tmpDate) in enumerate(obs_datetime):
+        for (counter, tmpDate) in enumerate(obs_all.index):
             if tmpDate.hour == startDate.hour and \
                 tmpDate.day == startDate.day and \
                 tmpDate.month == startDate.month and \
@@ -949,17 +952,24 @@ Run "%prog --help" for detailed description of all options
             sys.exit("Unable to find end date %s in observed data %s" %
                      (str(endDate), obsFilePath) )
         
+        obs_streamflow = obs_all['streamflow_mm']
         self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
-                          (obsStartIdx, str(obs_datetime[obsStartIdx]), obs_data[obsStartIdx] ) )
+                          (obsStartIdx, 
+                           str(obs_streamflow.index[obsStartIdx]), 
+                           obs_streamflow[obsStartIdx] ) )
         self.logger.debug("Obs end idx: %d, date: %s, value: %f" % 
-                      (obsEndIdx, str(obs_datetime[obsEndIdx]), obs_data[obsEndIdx] ) )
+                          (obsEndIdx, 
+                           str(obs_streamflow.index[obsEndIdx]), 
+                           obs_streamflow[obsEndIdx] ) )
 
         # Aggregate observed data as needed
-        obsTs = pd.Series(obs_data[obsStartIdx:obsEndIdx], index=obs_datetime[obsStartIdx:obsEndIdx])
+        #obsTs = pd.Series(obs_data[obsStartIdx:obsEndIdx], index=obs_datetime[obsStartIdx:obsEndIdx])
         if options.period == 'weekly':
-            obsTs = obsTs.resample('W-SUN', how='sum')
+            #obsTs = obsTs.resample('W-SUN', how='sum')
+            obsTs = obs_streamflow.resample('W-SUN', how='sum')
         elif options.period == 'monthly':
-            obsTs = obsTs.resample('M', how='sum')
+            #obsTs = obsTs.resample('M', how='sum')
+            obsTs = obs_streamflow.resample('M', how='sum')
 
         try:
             calibratorDB = \

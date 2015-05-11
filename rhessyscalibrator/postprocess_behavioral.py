@@ -400,15 +400,17 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         self.logger.debug("%d behavioral runs" % (numRuns,) )
         
         # Read observed data from file
-        obsFile = open(obsFilePath, 'r')
-        (obs_datetime, obs_data) = \
-            RHESSysOutput.readObservedDataFromFile(obsFile)
-        obsFile.close()
-        obs = pd.Series(obs_data, index=obs_datetime)
+#         obsFile = open(obsFilePath, 'r')
+#         (obs_datetime, obs_data) = \
+#             RHESSysOutput.readObservedDataFromFile(obsFile)
+#         obsFile.close()
+#         obs = pd.Series(obs_data, index=obs_datetime)
+        obs_all = pd.read_csv(obsFilePath, index_col=0, parse_dates=True)
+        obs = obs_all['streamflow']
         if end_date:
             obs = obs[:end_date]
         
-        self.logger.debug("Observed data: %s" % obs_data)
+        #self.logger.debug("Observed data: %s" % obs_data)
         
         likelihood = np.empty(numRuns)
         ysim = None
