@@ -925,7 +925,48 @@ job_id=?""",
             run = self._runRecordToObject(run_row, run_fitness)
             runs.append(run)
         
+        sub_cursor.close()
+        cursor.close()
+        
         return runs
+    
+    def exportRunsAndFitnessInPostProcess(self, postprocess_id, outfile, sep=',', header=True):
+        """ Write all runs, and their runfitness data, associated with post process entry to
+            a file-like object in CSV format
+
+            @param postprocess_id Integer representing the post process entry whose list of runs 
+            we want
+            @param outfile File-like object to which CSV-formatted output should be written. Note, caller
+            is responsible for closing outfile.
+        
+            @raise Exception if no runs for postprocess_id were found
+        """
+        cursor = self._conn.cursor()
+        
+        cols = ['postprocess_id', 'run_id', 'session_id', 'starttime', 'endtime', 'worldfile',
+                'param_s1', 'param_s2', 'param_s3', 'param_sv1', 'param_sv2', 'param_gw1', 'param_gw2',
+                'param_vgsen1', 'param_vgsen2', 'param_vgsen3','param_svalt1', 'param_svalt2', 'cmd_raw', 
+                'output_path', 'job_id', 'status', 'nse', 'nse_log', 'pbias', 'rsr', 'runoff_ratio']
+        
+        if header:
+            outfile.write(sep.join(cols))
+            outfile.write(os.linesep)
+        
+        cursor.execute("""SELECT postprocess_id,r.id AS run_id,session_id,starttime,endtime,worldfile,
+param_s1,param_s2,param_s3,param_sv1,param_sv2,param_gw1,param_gw2,param_vgsen1,param_vgsen2,param_vgsen3,
+param_svalt1,param_svalt2,cmd_raw,output_path,job_id,status,nse,nse_log,pbias,rsr,runoff_ratio
+FROM run AS r JOIN runfitness AS rf ON r.id=rf.run_id WHERE rf.postprocess_id=?""", (postprocess_id,))
+        had_rows = False
+        for row in cursor:
+            had_rows = True
+            row_as_str = [str(i) if i is not None else '' for i in row]
+            outfile.write(sep.join(row_as_str))
+            outfile.write(os.linesep)
+            
+        if not had_rows:
+            raise Exception("No runs found for post process ID {0}".format(postprocess_id))
+            
+        cursor.close()
     
     def _sessionRecordToObject(self, row):
         """ Translate a record from the "session" table into a 

@@ -40,6 +40,7 @@ import sys
 import os
 import errno
 from optparse import OptionParser
+import argparse
 import logging
 # import string
 # from datetime import datetime
@@ -1128,4 +1129,35 @@ Run "%prog --help" for detailed description of all options
         finally:
             # Decrement reference count, this will (hopefully) allow __del__
             #  to be called on the once referenced object
+            calibratorDB = None
+
+class RHESSysCalibratorPostprocessExport(object):
+    def main(self, args):
+        # Set up command line options
+        parser = argparse.ArgumentParser(description="Tool for exporting model run and associated fitness results for a post process session")
+        parser.add_argument("-b", "--basedir", action="store", 
+                            dest="basedir", required=True,
+                            help="Base directory for the calibration session")
+        parser.add_argument("-s", "--postprocess_session", action="store", type=int,
+                            dest="postprocess_id", required=True,
+                            help="Post-process session to use for behavioral runs.")
+        parser.add_argument("-f", "--outfile", required=True,
+                            help="Name of the file to write output to (contents will be overwritten).")
+        
+        options = parser.parse_args()
+        
+        outfile = os.path.abspath(options.outfile)
+        if not os.access(os.path.dirname(outfile), os.W_OK):
+            sys.exit("Unable to write to directory {0}".format(outfile))
+        
+        try:
+            calibratorDB = \
+                ModelRunnerDB2(RHESSysCalibrator.getDBPath(
+                    options.basedir))
+            of = open(outfile, 'w')
+            calibratorDB.exportRunsAndFitnessInPostProcess(options.postprocess_id, of)
+            of.close()
+        except:
+            raise
+        finally:
             calibratorDB = None
