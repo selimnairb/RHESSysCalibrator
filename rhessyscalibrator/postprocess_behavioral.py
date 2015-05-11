@@ -363,7 +363,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if None == postproc:
             raise Exception("Post-process session %d was not found in the calibration database %s" % (postprocess_id, dbPath))
         # Get session
-        session = self.calibratorDB.getSession(postproc.session_id)
+        session = calibratorDB.getSession(postproc.session_id)
         if None == session:
             raise Exception("Session %d was not found in the calibration database %s" % (postproc.session_id, dbPath))
         if session.status != "complete":
@@ -480,7 +480,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if None == postproc:
             raise Exception("Post-process session %d was not found in the calibration database %s" % (postprocess_id, dbPath))
         # Get session
-        session = self.calibratorDB.getSession(postproc.session_id)
+        session = calibratorDB.getSession(postproc.session_id)
         if None == session:
             raise Exception("Session %d was not found in the calibration database %s" % (postproc.session_id, dbPath))
         if session.status != "complete":
