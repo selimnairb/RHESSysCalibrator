@@ -205,8 +205,8 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             runs = self.calibratorDB.getRunsInPostProcess(postproc.id, where_clause=options.behavioral_filter)
             numRuns = len(runs)
             print(notes)
-            response = raw_input("%d runs selected of %d total runs (%.2f%%) in session %d, continue? [yes | no] " % \
-                                (numRuns, calibItr, (float(numRuns) / float(calibItr)) * 100, options.session_id ) )
+            response = raw_input("%d runs selected of %d total runs (%.2f%%) in post process session %d, calibration session %d, continue? [yes | no] " % \
+                                (numRuns, calibItr, (float(numRuns) / float(calibItr)) * 100, options.postprocess_id, postproc.session_id ) )
             response = response.lower()
             if response != 'y' and response != 'yes':
                 # Exit normally
