@@ -441,7 +441,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         
                 # Put data in matrix
                 dataLen = len(mod)
-                if ysim == None:
+                if ysim is None:
                     # Allocate matrix for results
                     ysim = np.empty( (numRuns, dataLen) )
                 assert( np.shape(ysim)[1] == dataLen )
