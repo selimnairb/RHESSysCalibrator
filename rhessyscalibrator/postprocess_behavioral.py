@@ -1213,7 +1213,7 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
                                         observed_file=None, behavioral_filter=options.behavioral_filter)
             if runsProcessed:
                 # Get the uncertainty boundary
-                colNames = ['streamflow']
+                colName = 'streamflow'
                 indexLabel = 'datetime'
                 
                 (minYsim, maxYsim, medianYsim, meanYsim) = \
@@ -1224,28 +1224,29 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
                 behavioralFilepath = os.path.join( outdirPath, behavioralFilename )
                 # Write out min timeseries
                 minFilepath = behavioralFilepath + '_min' + BehavioralTimeseriesOut.TIMESERIES_EXT
-                min_ts = pd.Series(minYsim, index=self.x, name=colNames)
+                
+                min_ts = pd.Series(minYsim, index=self.x, name=colName)
                 min_ts.to_csv(minFilepath, header=True, index_label=indexLabel)
                 
                 # Write out max timeseries
                 maxFilepath = behavioralFilepath + '_max' + BehavioralTimeseriesOut.TIMESERIES_EXT
-                max_ts = pd.Series(maxYsim, index=self.x, name=colNames)
+                max_ts = pd.Series(maxYsim, index=self.x, name=colName)
                 max_ts.to_csv(maxFilepath, header=True, index_label=indexLabel)
                 
                 # Write out median timeseries
                 medianFilepath = behavioralFilepath + '_median' + BehavioralTimeseriesOut.TIMESERIES_EXT
-                median_ts = pd.Series(medianYsim, index=self.x, name=colNames)
+                median_ts = pd.Series(medianYsim, index=self.x, name=colName)
                 median_ts.to_csv(medianFilepath, header=True, index_label=indexLabel)
                 
                 # Write out mean timeseries
                 meanFilepath = behavioralFilepath + '_mean' + BehavioralTimeseriesOut.TIMESERIES_EXT
-                mean_ts = pd.Series(meanYsim, index=self.x, name=colNames)
+                mean_ts = pd.Series(meanYsim, index=self.x, name=colName)
                 mean_ts.to_csv(meanFilepath, header=True, index_label=indexLabel)
                 
                 # Write out weighted ensemble mean timeseries (Seibert and Beven 2009)
                 wghtMeanFilepath = behavioralFilepath + '_weighted_ensmb_mean' + BehavioralTimeseriesOut.TIMESERIES_EXT
                 wghtMean = calculateWeightedEnsembleMean(self.ysim, self.likelihood)
-                mean_ts = pd.Series(wghtMean, index=self.x, name=colNames)
+                mean_ts = pd.Series(wghtMean, index=self.x, name=colName)
                 mean_ts.to_csv(wghtMeanFilepath, header=True, index_label=indexLabel)
                 
         except:
