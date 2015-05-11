@@ -353,6 +353,8 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             self.calibratorDB.updateSessionEndtime(self.session.id,
                                                    datetime.utcnow(),
                                                    "complete") 
+            
+            print("\n\nBehavioral results saved to session {0}, post-process session {1}".format(self.session.id, behave_postproc_id))
         except:
             raise
         else:
