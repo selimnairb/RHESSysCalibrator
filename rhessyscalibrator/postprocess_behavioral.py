@@ -1220,7 +1220,7 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
                     calculateUncertaintyBounds(self.ysim, self.likelihood,
                                                options.lowerBound, options.upperBound)
                 
-                behavioralFilename = "%s_POSTPROCESS_SESSION_%s" % ( options.outfile, options.session_id )
+                behavioralFilename = "%s_POSTPROCESS_SESSION_%s" % ( options.outfile, options.postprocess_id )
                 behavioralFilepath = os.path.join( outdirPath, behavioralFilename )
                 # Write out min timeseries
                 minFilepath = behavioralFilepath + '_min' + BehavioralTimeseriesOut.TIMESERIES_EXT
