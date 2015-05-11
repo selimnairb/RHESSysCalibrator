@@ -178,6 +178,14 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
         
         (process_stdout, process_stderr) = process.communicate()
         
+        # Write model command to file
+        fileName = "cmd.txt"
+        cmdOutFile = os.path.join(self.run_path, job.output_path,
+                                  fileName)
+        cmdOut = open(cmdOutFile, "w")
+        cmdOut.write(job.cmd_raw)
+        cmdOut.close()
+        
         # Write stdout to file named: 
         #  ${self.run_path}/${job.output_path}/${job.job_id}.out
         fileName = str(job.job_id) + ".out"
