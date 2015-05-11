@@ -268,7 +268,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                                                          notes,
                                                          cmd_proto_noparam)
             # Create postprocess session
-            behave_postproc_id = self.calibratorDB.insertPostProcess(self.session.id, self.session.obs_filename, postproc.fitness_period,
+            behave_postproc_id = self.calibratorDB.insertPostProcess(self.session.id, postproc.obs_filename, postproc.fitness_period,
                                                                      exclude_date_ranges=postproc.exclude_date_ranges)
             
             # Initialize CalibrationRunner consumers for executing jobs
