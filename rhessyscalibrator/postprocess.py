@@ -49,6 +49,8 @@ import logging
 import math
 import numpy
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg') # Allow for running on machines without X servers
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
