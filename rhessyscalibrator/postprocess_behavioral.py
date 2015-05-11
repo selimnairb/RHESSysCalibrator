@@ -1207,6 +1207,7 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
         outdirPath = os.path.abspath(options.outdir)
 
         try:
+            print("Using behavioral filter: {0}".format(options.behavioral_filter))
             (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
                 self.readBehavioralData(basedir, options.postprocess_id, 'streamflow',
                                         observed_file=None, behavioral_filter=options.behavioral_filter)
