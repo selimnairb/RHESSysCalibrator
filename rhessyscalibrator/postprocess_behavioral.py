@@ -45,8 +45,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import statsmodels.api as sm
-import matplotlib.pyplot as plt
 import matplotlib
+matplotlib.use('Agg') # Allow for running on machines without X servers
+import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
 from rhessysworkflows.rhessys import RHESSysOutput
@@ -671,6 +672,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
             plotExceedance = False
 
         try:
+            print("Using behavioral filter: {0}".format(options.behavioral_filter))
             (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
                 self.readBehavioralData(basedir, options.postprocess_id, 'streamflow',
                                         options.observed_file, options.behavioral_filter, end_date=endDate)
