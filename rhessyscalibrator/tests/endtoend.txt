@@ -1,0 +1,64 @@
+
+# rhessys_calibrator.py
+
+## postprocess mode
+
+### Test run time for 19 months
+time rhessys_calibrator.py -b Coweeta-custom -p "Coweeta WS14, debug run of 1" -i 1 -j 1 --parallel_mode process
+
+~2 minutes for one run.
+
+Delete Coweeta-custom/db/calibration.sqlite
+
+Delete output
+
+Change cmd.proto to run for 1 day
+
+### Interrupt some runs so that we can test restarting
+rhessys_calibrator.py -b Coweeta-custom -p "Coweeta WS14, debug run of 6" -n "for testing restart" -i 6 -j 2 --parallel_mode process
+
+Interrupt after two jobs have finished.
+
+rhessys_calibrator_restart.py -b Coweeta-custom -s 1 -j 2 --parallel_mode process
+
+
+Delete Coweeta-custom/db/calibration.sqlite
+
+Delete output
+
+Change cmd.proto to run for 19 months
+
+### Run 8 model runs to use for calibration post-processing
+rhessys_calibrator.py -b Coweeta-custom -p "Coweeta WS14, test run of 8" -n "for testing post processing" -i 8 -j 8 --parallel_mode process
+
+rhessys_calibrator_postprocess.py -b Coweeta-custom -s 1 -f CWT_WS14_obs-discharge_CY1991-CY1997.txt --enddate 1992 10 1 1 --figureX 8 --figureY 6
+
+### Perform behavioral simulations
+Make cmd.proto.behave
+
+rhessys_calibrator_behavioral.py -b Coweeta-custom -p "behavioral test" -s 5 -j 4 -f where "nse>0 or nse_log>0" --parallel_mode process -c cmd.proto.behave
+
+Behavioral results saved to session 5, post-process session 8
+
+### Post-process behavioral simulations
+rhessys_calibrator_postprocess_behavioral.py -b Coweeta-custom -s 8 -f CWT_WS14_obs-discharge_CY1991-CY1997.txt --behavioral_filter "nse>-60"
+
+
+### Behavioral comparison
+rhessys_calibrator_postprocess_behavioral_compare.py --behavioral_filter "nse>-60" Coweeta-custom Coweeta-custom 8 8
+
+### Behavioral timeseries
+rhessys_calibrator_postprocess_behavioral_timeseries.py -b Coweeta-custom -s 8 --behavioral_filter "nse>-60"
+
+
+## PBS mode
+Change cmd.proto to run for 1 day
+
+rhessys_calibrator.py -b Coweeta-custom -p "Coweeta WS14, test run of 8" -n "for testing post processing" -i 8 -j 8 --parallel_mode pbs
+
+
+## LSF mode
+Change cmd.proto to run for 1 day
+
+rhessys_calibrator.py -b Coweeta-custom_LSFtest -p "Coweeta WS14, test run of 8" -n "for testing post processing" -i 8 -j 8 --parallel_mode lsf -q day --mem_limit 1
+
