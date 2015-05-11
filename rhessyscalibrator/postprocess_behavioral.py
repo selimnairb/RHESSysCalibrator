@@ -1030,6 +1030,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                                options.enddate[3])
 
         try:
+            print("Using behavioral filter: {0}".format(options.behavioral_filter))
             # Read data for first behavioral run
             (runsProcessed1, self.obs1, self.x1, self.ysim1, self.likelihood1) = \
                 self.readBehavioralData(basedir1, session1, 'streamflow',
