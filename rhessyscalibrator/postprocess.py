@@ -919,7 +919,7 @@ Run "%prog --help" for detailed description of all options
                                options.enddate[3])
             if not endDate > startDate:
                 sys.exit("End date %s is not greater than start date %s" % \
-                         (str(endDate, str(startDate)) ) )
+                         (str(endDate), str(startDate) ) )
         else:
             # Set end date based on observed data
             endDate = obs_datetime[-1]
