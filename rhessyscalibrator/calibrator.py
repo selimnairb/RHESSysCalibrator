@@ -1392,8 +1392,8 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             numNewRuns = self.session.iterations - numRunsDone - numToRestart
             print("New runs: %s" % (numNewRuns,) )
             
-            if len(freeRunIds) != numNewRuns:
-                sys.exit("The number of free Run IDs (%d) does not equal the needed number of new runs (%d)" % (len(freeRunIds), numNewRuns) )
+            if len(freeRunIds) < numNewRuns:
+                sys.exit("The number of free Run IDs (%d) is less than the needed number of new runs (%d)" % (len(freeRunIds), numNewRuns) )
             
             response = raw_input("Continue? [yes | no] " )
             response = response.lower()
