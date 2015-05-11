@@ -1117,7 +1117,7 @@ Run "%prog --help" for detailed description of all options
                 self.saveCovariancePlot(outdirPath, covFilename, format='PDF', 
                                         sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
                 
-                print("\n\nFitness results saved to process session: {0}".format(postprocID))
+                print("\n\nFitness results saved to post-process session: {0}".format(postprocID))
         except:
             raise
         else:

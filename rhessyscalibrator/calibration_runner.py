@@ -43,7 +43,7 @@ import re
 import time
 from datetime import datetime
 
-from rhessyscalibrator.model_runner_db import *
+from rhessyscalibrator.model_runner_db2 import *
 
 class CalibrationRunner(object):
     """ Abstract super class for all consumer objects that run ModelRun  
@@ -76,7 +76,7 @@ class CalibrationRunner(object):
         self.logger = logger
         self.restart_runs = restart_runs
 
-        self.db = ModelRunnerDB(db_path) 
+        self.db = ModelRunnerDB2(db_path) 
         self.numActiveJobs = 0
     
     def __del__(self):
@@ -85,6 +85,34 @@ class CalibrationRunner(object):
     
     def run(self):
         raise NotImplementedError()
+    
+    def storeJobInDB(self, job):
+        """ Store new job in ModelRunnerDB2
+        
+            @param job ModelRun2 object representing the new job
+            
+            @note Will set job.id based on ID of inserted run.
+        """
+        # New run, store in ModelRunnerDB2 (insertRun)
+        insertedRunID = self.db.insertRun(job.session_id,
+                                          job.worldfile,
+                                          job.param_s1, job.param_s2,
+                                          job.param_s3, job.param_sv1,
+                                          job.param_sv2, job.param_gw1,
+                                          job.param_gw2, job.param_vgsen1,
+                                          job.param_vgsen2, job.param_vgsen3,
+                                          job.param_svalt1, job.param_svalt2,
+                                          job.cmd_raw,
+                                          job.output_path,
+                                          job.job_id)
+        job.id = insertedRunID
+        if job.run_fitness:
+            # Behavioral runs will already have run fitness results
+            self.db.insertRunFitnessResults(job.run_fitness.postprocess_id, job.id, 
+                                            job.run_fitness.nse, job.run_fitness.nse_log, 
+                                            job.run_fitness.pbias, job.run_fitness.rsr, 
+                                            job.run_fitness.runoff_ratio, 
+                                            job.run_fitness.userfitness)        
     
     def jobCompleteCallback(self, *args, **kwargs):
         """ Called when a job is complete. 
@@ -141,26 +169,9 @@ class CalibrationRunnerSubprocess(CalibrationRunner):
             if run is None:
                 raise Exception("Run %d does not exist and cannot be restarted" % (job.id,) )
         else:
-            # New run, store in ModelRunnerDB (insertRun)
-            insertedRunID = self.db.insertRun(job.session_id,
-                                              job.worldfile,
-                                              job.param_s1, job.param_s2,
-                                              job.param_s3, job.param_sv1,
-                                              job.param_sv2, job.param_gw1,
-                                              job.param_gw2, job.param_vgsen1,
-                                              job.param_vgsen2, job.param_vgsen3,
-                                              job.param_svalt1, job.param_svalt2,
-                                              job.cmd_raw,
-                                              job.output_path,
-                                              job.job_id,
-                                              job.fitness_period,
-                                              job.nse, job.nse_log,
-                                              job.pbias, job.rsr,
-                                              job.user1, job.user2, job.user3)
-            job.id = insertedRunID
-        
-#        print("runJobInSubprocess: __rhessys_base: %s, cwd: %s, target cwd: %s, cmd: %s" % (self.__rhessys_base, os.getcwd(), os.path.abspath( self.basedir ), job.cmd_raw ) )
-        
+            # New run, store in DB
+            self.storeJobInDB(job)
+               
         # Open model process
         process = Popen(job.cmd_raw, shell=True, stdout=PIPE, stderr=PIPE,
                         cwd=self.run_path, bufsize=1)
@@ -578,23 +589,8 @@ class CalibrationRunnerLSF(CalibrationRunnerQueue):
             # Update job_id
             self.db.updateRunJobId(job.id, job.job_id)
         else:
-            # New run, store in ModelRunnerDB (insertRun)
-            insertedRunID = self.db.insertRun(job.session_id,
-                                              job.worldfile,
-                                              job.param_s1, job.param_s2,
-                                              job.param_s3, job.param_sv1,
-                                              job.param_sv2, job.param_gw1,
-                                              job.param_gw2, job.param_vgsen1,
-                                              job.param_vgsen2, job.param_vgsen3,
-                                              job.param_svalt1, job.param_svalt2,
-                                              job.cmd_raw,
-                                              job.output_path,
-                                              job.job_id,
-                                              job.fitness_period,
-                                              job.nse, job.nse_log,
-                                              job.pbias, job.rsr,
-                                              job.user1, job.user2, job.user3)
-            job.id = insertedRunID
+            # New run, store in DB
+            self.storeJobInDB(job)
              
         self.logger.critical("Run %s submitted as job %s" % 
                              (job.id, job.job_id))
@@ -723,23 +719,8 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
             # Update job_id
             self.db.updateRunJobId(job.id, job.job_id)
         else:
-            # New run, store in ModelRunnerDB (insertRun)
-            insertedRunID = self.db.insertRun(job.session_id,
-                                              job.worldfile,
-                                              job.param_s1, job.param_s2,
-                                              job.param_s3, job.param_sv1,
-                                              job.param_sv2, job.param_gw1,
-                                              job.param_gw2, job.param_vgsen1,
-                                              job.param_vgsen2, job.param_vgsen3,
-                                              job.param_svalt1, job.param_svalt2,
-                                              job.cmd_raw,
-                                              job.output_path,
-                                              job.job_id,
-                                              job.fitness_period,
-                                              job.nse, job.nse_log,
-                                              job.pbias, job.rsr,
-                                              job.user1, job.user2, job.user3)
-            job.id = insertedRunID
+            # New run, store in DB
+            self.storeJobInDB(job)
             
         self.logger.critical("Run %s submitted as job %s" % 
                              (job.id, job.job_id))

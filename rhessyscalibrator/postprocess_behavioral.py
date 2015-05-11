@@ -52,7 +52,7 @@ from matplotlib.ticker import FuncFormatter
 from rhessysworkflows.rhessys import RHESSysOutput
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
-from rhessyscalibrator.model_runner_db import *
+from rhessyscalibrator.model_runner_db2 import *
 
 
 def exceedance_prob(y):
@@ -338,7 +338,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         self.logger.addHandler(consoleHandler)
         
         
-    def readBehavioralData(self, basedir, session_id, variable='streamflow',
+    def readBehavioralData(self, basedir, postprocess_id, variable='streamflow',
                            observed_file=None, behavioral_filter=None, end_date=None):
         
         dbPath = RHESSysCalibrator.getDBPath(basedir)
@@ -355,13 +355,17 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
         
         calibratorDB = \
-            ModelRunnerDB(RHESSysCalibrator.getDBPath(
+            ModelRunnerDB2(RHESSysCalibrator.getDBPath(
                 basedir))
         
-        # Make sure the session exists
-        session = calibratorDB.getSession(session_id)
+        # Get post-process session
+        postproc = calibratorDB.getPostProcess(postprocess_id)
+        if None == postproc:
+            raise Exception("Post-process session %d was not found in the calibration database %s" % (postprocess_id, dbPath))
+        # Get session
+        session = self.calibratorDB.getSession(postproc.session_id)
         if None == session:
-            raise Exception("Session %d was not found in the calibration database %s" % (session_id, dbPath))
+            raise Exception("Session %d was not found in the calibration database %s" % (postproc.session_id, dbPath))
         if session.status != "complete":
             print "WARNING: session status is: %s.  Some model runs may not have completed." % (session.status,)
         else:
@@ -371,9 +375,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         if observed_file:
             obs_file = observed_file
         else:
-            # Get observered file from session
-            assert( session.obs_filename != None )
-            obs_file = session.obs_filename
+            # Get observered file from post-process session
+            assert( postproc.obs_filename != None )
+            obs_file = postproc.obs_filename
         obsPath = RHESSysCalibrator.getObsPath(basedir)
         obsFilePath = os.path.join(obsPath, obs_file)
         if not os.access(obsFilePath, os.R_OK):
@@ -381,13 +385,13 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         self.logger.debug("Obs path: %s" % obsFilePath)
         
         # Get runs in session
-        runs = calibratorDB.getRunsInSession(session.id, where_clause=behavioral_filter)
+        runs = calibratorDB.getRunsInPostProcess(postprocess_id, where_clause=behavioral_filter)
         numRuns = len(runs) 
         if numRuns == 0:
-            raise Exception("No runs found for session %d" 
-                            % (session.id,))
-        response = raw_input("%d runs selected for plotting from session %d in basedir '%s', continue? [yes | no] " % \
-                            (numRuns, session_id, os.path.basename(basedir) ) )
+            raise Exception("No runs found for post process session %d, calibration session %d" 
+                            % (postprocess_id, session.id))
+        response = raw_input("%d runs selected for plotting from post process session %d, calibration session %d in basedir '%s', continue? [yes | no] " % \
+                            (numRuns, postprocess_id, session.id, os.path.basename(basedir) ) )
         response = response.lower()
         if response != 'y' and response != 'yes':
             # Exit normally
@@ -443,7 +447,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 ysim[i,] = mod
                 
                 # Store fitness parameter
-                likelihood[i] = run.nse
+                likelihood[i] = run.run_fitness.nse
                         
                 tmpFile.close()                
                 runsProcessed = True
@@ -451,7 +455,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         return (runsProcessed, obs, x, ysim, likelihood)
     
     
-    def readBehavioralDataMulti(self, basedir, session_id, cols=['streamflow'],
+    def readBehavioralDataMulti(self, basedir, postprocess_id, cols=['streamflow'],
                                 observed_file=None, behavioral_filter=None, end_date=None):
         
         dbPath = RHESSysCalibrator.getDBPath(basedir)
@@ -468,13 +472,17 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
         
         calibratorDB = \
-            ModelRunnerDB(RHESSysCalibrator.getDBPath(
+            ModelRunnerDB2(RHESSysCalibrator.getDBPath(
                 basedir))
         
-        # Make sure the session exists
-        session = calibratorDB.getSession(session_id)
+        # Get post-process session
+        postproc = calibratorDB.getPostProcess(postprocess_id)
+        if None == postproc:
+            raise Exception("Post-process session %d was not found in the calibration database %s" % (postprocess_id, dbPath))
+        # Get session
+        session = self.calibratorDB.getSession(postproc.session_id)
         if None == session:
-            raise Exception("Session %d was not found in the calibration database %s" % (session_id, dbPath))
+            raise Exception("Session %d was not found in the calibration database %s" % (postproc.session_id, dbPath))
         if session.status != "complete":
             print "WARNING: session status is: %s.  Some model runs may not have completed." % (session.status,)
         else:
@@ -494,13 +502,13 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         self.logger.debug("Obs path: %s" % obsFilePath)
         
         # Get runs in session
-        runs = calibratorDB.getRunsInSession(session.id, where_clause=behavioral_filter)
+        runs = calibratorDB.getRunsInPostProcess(postprocess_id, where_clause=behavioral_filter)
         numRuns = len(runs) 
         if numRuns == 0:
-            raise Exception("No runs found for session %d" 
-                            % (session.id,))
-        response = raw_input("%d runs selected for plotting from session %d in basedir '%s', continue? [yes | no] " % \
-                            (numRuns, session_id, os.path.basename(basedir) ) )
+            raise Exception("No runs found for post process session %d, calibration session %d" 
+                            % (postprocess_id, session.id))
+        response = raw_input("%d runs selected for plotting from post process session %d, calibration session %d in basedir '%s', continue? [yes | no] " % \
+                            (numRuns, postprocess_id, session.id, os.path.basename(basedir) ) )
         response = response.lower()
         if response != 'y' and response != 'yes':
             # Exit normally
@@ -552,7 +560,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                 sim.append(mod_align)
                 
                 # Store fitness parameter
-                likelihood[i] = run.nse
+                likelihood[i] = run.run_fitness.nse
                         
                 tmpFile.close()                
                 runsProcessed = True
@@ -567,9 +575,9 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                             dest="basedir", required=True,
                             help="Base directory for the calibration session")
         
-        parser.add_argument("-s", "--behavioral_session", action="store", type=int,
-                            dest="session_id", required=True,
-                            help="Session to use for behavioral runs.")
+        parser.add_argument("-s", "--postprocess_session", action="store", type=int,
+                            dest="postprocess_id", required=True,
+                            help="Post-process session to use for behavioral runs.")
         
         parser.add_argument("-t", "--title", action="store",
                             dest="title",
@@ -664,7 +672,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
 
         try:
             (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
-                self.readBehavioralData(basedir, options.session_id, 'streamflow',
+                self.readBehavioralData(basedir, options.postprocess_id, 'streamflow',
                                         options.observed_file, options.behavioral_filter, end_date=endDate)
             
             if runsProcessed:
@@ -683,7 +691,7 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     behavioralFilename += '_color'
                 if options.legend:
                     behavioralFilename += '_legend'
-                behavioralFilename += "_SESSION_%s" % ( options.session_id, )
+                behavioralFilename += "_POSTPROCESS_SESSION_%s" % ( options.postprocess_id, )
                 # Generate visualizations
                 self.saveUncertaintyBoundsPlot(outdirPath, behavioralFilename, 
                                                2.5, 97.5, format=options.outputFormat, log=False,
@@ -924,8 +932,8 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
         parser.add_argument("basedirs", metavar="BASEDIRS", nargs=2,
                             help="Base directories of the two calibration sessions to be compared")
         
-        parser.add_argument("sessions", metavar="SESSIONS", type=int, nargs=2,
-                            help="Session IDs of the two behavioral runs.")
+        parser.add_argument("postprocess_sessions", metavar="POSTPROC_SESSIONS", type=int, nargs=2,
+                            help="Post-process session IDs of the two behavioral runs.")
         
         parser.add_argument("-t", "--title",
                             dest="title",
@@ -994,14 +1002,14 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
             self._initLogger(logging.NOTSET)
         
         basedir1 = options.basedirs[0]
-        session1 = options.sessions[0]
+        session1 = options.postprocess_sessions[0]
         if not os.path.isdir(basedir1) or not os.access(basedir1, os.R_OK):
             sys.exit("Unable to access basedir %s" % (basedir1,) )
         behavioralFilename += '_' + os.path.basename(basedir1)
         basedir1 = os.path.abspath(basedir1)
         
         basedir2 = options.basedirs[1]
-        session2 = options.sessions[1]
+        session2 = options.postprocess_sessions[1]
         if not os.path.isdir(basedir2) or not os.access(basedir2, os.R_OK):
             sys.exit("Unable to access basedir %s" % (basedir2,) )
         behavioralFilename += '_V_' + os.path.basename(basedir2)
@@ -1119,7 +1127,7 @@ class BehavioralComparison(RHESSysCalibratorPostprocessBehavioral):
                 
             else:
                 if not runsProcessed1:
-                    errorStr = "Did not read any behavioral data for basedir %s, session %d"
+                    errorStr = "Did not read any behavioral data for basedir %s, post-process session %d"
                     self.logger.error(errorStr % \
                                       (basedir1, session1) )
                 if not runsProcessed2:
@@ -1147,9 +1155,9 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
                             dest="basedir", required=True,
                             help="Base directory for the calibration session")
         
-        parser.add_argument("-s", "--behavioral_session", action="store", type=int,
-                            dest="session_id", required=True,
-                            help="Session to use for behavioral runs.")
+        parser.add_argument("-s", "--postprocess_session", action="store", type=int,
+                            dest="postprocess_id", required=True,
+                            help="Post-process session to use for behavioral runs.")
         
         parser.add_argument("-o", "--outdir", action="store", required=False,
                             dest="outdir",
@@ -1197,7 +1205,7 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
 
         try:
             (runsProcessed, self.obs, self.x, self.ysim, self.likelihood) = \
-                self.readBehavioralData(basedir, options.session_id, 'streamflow',
+                self.readBehavioralData(basedir, options.postprocess_id, 'streamflow',
                                         observed_file=None, behavioral_filter=options.behavioral_filter)
             if runsProcessed:
                 # Get the uncertainty boundary
@@ -1208,7 +1216,7 @@ class BehavioralTimeseriesOut(RHESSysCalibratorPostprocessBehavioral):
                     calculateUncertaintyBounds(self.ysim, self.likelihood,
                                                options.lowerBound, options.upperBound)
                 
-                behavioralFilename = "%s_SESSION_%s" % ( options.outfile, options.session_id )
+                behavioralFilename = "%s_POSTPROCESS_SESSION_%s" % ( options.outfile, options.session_id )
                 behavioralFilepath = os.path.join( outdirPath, behavioralFilename )
                 # Write out min timeseries
                 minFilepath = behavioralFilepath + '_min' + BehavioralTimeseriesOut.TIMESERIES_EXT

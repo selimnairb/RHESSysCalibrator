@@ -46,7 +46,7 @@ from string import Template
 import multiprocessing
 import re
 
-from rhessyscalibrator.model_runner_db import *
+from rhessyscalibrator.model_runner_db2 import *
 from rhessyscalibrator.calibration_runner import *
 from rhessyscalibrator.calibration_parameters import *
 
@@ -744,12 +744,6 @@ class RHESSysCalibrator(object):
                     # Test to see if file is readable
                     if os.access(entryPath, os.R_OK):
                         tecfile = entry
-                        # Strip $BASEDIR and "rhessys" off of front of tecfile
-                        #  path before storing
-#                        entryPathElem = entryPath.split(os.sep)
-#                        pathToFilename = os.path.join(entryPathElem[2],
-#                                                      entryPathElem[3],
-#                                                      entryPathElem[4])
                         ret = True
                         break
 
@@ -855,8 +849,8 @@ class RHESSysCalibrator(object):
 
         # Create the CalibrationSession
         sessionID = self.calibratorDB.insertSession(user, project, notes,
-                                                      iterations, processes,
-                                                      basedir, cmd_proto)
+                                                    iterations, processes,
+                                                    basedir, cmd_proto)
         assert sessionID != None
         
         # Could eliminate DB round trip if we just pack our own object,
@@ -1127,8 +1121,7 @@ with the calibration session""")
                               RHESSysCalibrator.getDBPath(self.basedir))
 
             self.calibratorDB = \
-                ModelRunnerDB(RHESSysCalibrator.getDBPath(
-                    self.basedir))
+                ModelRunnerDB2(RHESSysCalibrator.getDBPath(self.basedir))
 
             # Create session
             self.session = self.createCalibrationSession(options.user, 
@@ -1162,7 +1155,7 @@ with the calibration session""")
                     self.logger.critical("Iteration %d, worldfile: %s" %
                                          (itr, worldfile))
                     # Create new ModelRun object for this run
-                    run = ModelRun()
+                    run = ModelRun2()
                     run.session_id = self.session.id
                     run.worldfile = worldfile
                     run.setCalibrationParameters(parameterValues)
@@ -1208,8 +1201,8 @@ with the calibration session""")
 
             # Update session endtime and status
             self.calibratorDB.updateSessionEndtime(self.session.id,
-                                                     datetime.utcnow(),
-                                                     "complete")
+                                                   datetime.utcnow(),
+                                                   "complete")
                         
 
         except:
@@ -1340,8 +1333,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
         
         try:
             calibratorDB = \
-                ModelRunnerDB(RHESSysCalibrator.getDBPath(
-                    self.basedir))
+                ModelRunnerDB2(RHESSysCalibrator.getDBPath(self.basedir))
         
             # Make sure the session exists
             self.session = calibratorDB.getSession(args.session_id)
@@ -1403,8 +1395,6 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             if len(freeRunIds) != numNewRuns:
                 sys.exit("The number of free Run IDs (%d) does not equal the needed number of new runs (%d)" % (len(freeRunIds), numNewRuns) )
             
-            #import pdb; pdb.set_trace()
-            
             response = raw_input("Continue? [yes | no] " )
             response = response.lower()
             if response != 'y' and response != 'yes':
@@ -1462,7 +1452,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                     self.logger.critical("run.id %d, worldfile: %s" %
                                          (runId, worldfile))
                     # Create new ModelRun object for this run
-                    run = ModelRun()
+                    run = ModelRun2()
                     run.session_id = self.session.id
                     run.worldfile = worldfile
                     run.setCalibrationParameters(parameterValues)

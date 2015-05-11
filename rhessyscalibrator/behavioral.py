@@ -45,7 +45,7 @@ import time
 
 import calibrator
 from rhessyscalibrator.calibrator import RHESSysCalibrator
-from rhessyscalibrator.model_runner_db import *
+from rhessyscalibrator.model_runner_db2 import *
 
 class RHESSysCalibratorBehavioral(RHESSysCalibrator):
     
@@ -60,9 +60,9 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                           dest="basedir", required=True,
                           help="Base directory for the calibration session")
         
-        parser.add_argument("-s", "--behavioral_session", action="store", type=int,
-                          dest="session_id", required=True,
-                          help="Session to use for behavioral runs.")
+        parser.add_argument("-s", "--postprocess_session", action="store", type=int,
+                          dest="postprocess_id", required=True,
+                          help="Post-process session to use for behavioral runs.")
         
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument("-st", dest="startDate", nargs=4, type=int,
@@ -189,16 +189,20 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
 
         try:
             dbPath = RHESSysCalibrator.getDBPath(self.basedir)
-            self.calibratorDB = ModelRunnerDB(dbPath)
+            self.calibratorDB = ModelRunnerDB2(dbPath)
         
-            # Get calibration session
-            calibSession = self.calibratorDB.getSession(options.session_id)
+            # Get post-process session
+            postproc = self.calibratorDB.getPostProcess(options.postprocess_id)
+            if None == postproc:
+                raise Exception("Post-process session %d was not found in the calibration database %s" % (options.postprocess_id, dbPath))
+            # Get session
+            calibSession = self.calibratorDB.getSession(postproc.session_id)
             if None == calibSession:
-                raise Exception("Session %d was not found in the calibration database %s" % (options.session_id, dbPath))
+                raise Exception("Session %d was not found in the calibration database %s" % (postproc.session_id, dbPath))
             calibItr = calibSession.iterations
 
             # Get runs in calibration session
-            runs = self.calibratorDB.getRunsInSession(calibSession.id, options.behavioral_filter)
+            runs = self.calibratorDB.getRunsInPostProcess(postproc.id, where_clause=options.behavioral_filter)
             numRuns = len(runs)
             print(notes)
             response = raw_input("%d runs selected of %d total runs (%.2f%%) in session %d, continue? [yes | no] " % \
@@ -263,10 +267,9 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                                                          self.basedir,
                                                          notes,
                                                          cmd_proto_noparam)
-            # Get observation file from calibrationSession
-            self.session.obs_filename = calibSession.obs_filename
-            self.calibratorDB.updateSessionObservationFilename(self.session.id,
-                                                               self.session.obs_filename)
+            # Create postprocess session
+            behave_postproc_id = self.calibratorDB.insertPostProcess(self.session.id, self.session.obs_filename, postproc.fitness_period,
+                                                                     exclude_date_ranges=postproc.exclude_date_ranges)
             
             # Initialize CalibrationRunner consumers for executing jobs
             (runQueue, consumers) = \
@@ -290,20 +293,22 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
                 for worldfile in self.worldfiles.keys():
                     self.logger.critical("Iteration %d, worldfile: %s" %
                                          (itr, worldfile))
-                    # Create new ModelRun object for this run
-                    behavioralRun = ModelRun()
+                    # Create new ModelRun2 object for this run
+                    behavioralRun = ModelRun2()
                     behavioralRun.session_id = self.session.id
                     behavioralRun.worldfile = worldfile
                     behavioralRun.setCalibrationParameters(parameterValues)
-                    # Copy fitness parameters so that we can draw undercertainty bounds later
-                    behavioralRun.nse = run.nse
-                    behavioralRun.nse_log = run.nse_log
-                    behavioralRun.pbias = run.pbias
-                    behavioralRun.rsr = run.rsr
-                    behavioralRun.user1 = run.user1
-                    behavioralRun.user2 = run.user2
-                    behavioralRun.user3 = run.user3
-                    behavioralRun.fitness_period = run.fitness_period
+                    # Create new Runfitness2 object for this run, copying fitness parameters so that we can 
+                    # draw undercertainty bounds later
+                    behavioralRunfit = RunFitness2()
+                    behavioralRunfit.postprocess_id = behave_postproc_id
+                    behavioralRunfit.nse = run.run_fitness.nse
+                    behavioralRunfit.nse_log = run.run_fitness.nse_log
+                    behavioralRunfit.pbias = run.run_fitness.pbias
+                    behavioralRunfit.rsr = run.run_fitness.rsr
+                    behavioralRunfit.runoff_ratio = run.run_fitness.runoff_ratio
+                    behavioralRunfit.userfitness = run.run_fitness.userfitness
+                    behavioralRun.run_fitness = behavioralRunfit
                     
                     # Add worldfile and flowtable paths to command
                     if self.explicitRouting:

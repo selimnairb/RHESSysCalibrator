@@ -895,7 +895,7 @@ job_id=?""",
             @note This method does not scrub the where_clause of dangerous elements. 
             Use at your own risk.
 
-            @return An array of ModelRun objects
+            @return An array of ModelRun2 objects
         """
         cursor = self._conn.cursor()
         sub_cursor = self._conn.cursor()
