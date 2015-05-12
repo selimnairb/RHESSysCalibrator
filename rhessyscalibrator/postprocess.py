@@ -58,19 +58,12 @@ from mpl_toolkits.mplot3d import Axes3D
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db2 import *
 
+OBS_HEADER_STREAMFLOW = 'streamflow_mm'
+OBS_HEADER_PRECIP = 'precip_mm'
 
 class RHESSysCalibratorPostprocess(object):
     """ Main driver class for rhessys_calibrator_postprocess tool
     """
-#     TIME_STEP_HOURLY = 1
-#     TIME_STEP_DAILY = 2
-#     TIME_STEPS = [TIME_STEP_HOURLY, TIME_STEP_DAILY]
-    
-#     HOUR_HEADER = 'hour'
-#     DAY_HEADER = 'day'
-#     MONTH_HEADER = 'month'
-#     YEAR_HEADER = 'year'
-    
     PARAM_S1_IDX = 0
     PARAM_S1_NAME = 'm - drainage'
     PARAM_S2_IDX = 1
@@ -946,7 +939,7 @@ Run "%prog --help" for detailed description of all options
             sys.exit("Unable to find end date %s in observed data %s" %
                      (str(endDate), obsFilePath) )
         
-        obs_streamflow = obs_all['streamflow_mm']
+        obs_streamflow = obs_all[OBS_HEADER_STREAMFLOW]
         self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
                           (obsStartIdx, 
                            str(obs_streamflow.index[obsStartIdx]), 
@@ -1009,7 +1002,6 @@ Run "%prog --help" for detailed description of all options
                         print "Output file %s for run %d not found or not readable, unable to calculate fitness statistics for this run" % (tmpOutfile, run.id)
                         continue
                     
-                    #tmpFile = open(tmpOutfile, 'r')
                     mod = pd.read_csv(tmpOutfile, sep=' ', 
                                       parse_dates={'date':[0,1,2]}, 
                                       index_col=0)
@@ -1019,9 +1011,8 @@ Run "%prog --help" for detailed description of all options
                     else:
                         tmpResults = mod['streamflow']
                             
-                    #tmpFile.close()
-            
                     # Make sure observed and modeled data are of the same extent
+                    # Don't use panda's alignment as this doesn't work correctly in come versions
                     if calibDays > len(tmpResults):
                         sys.exit("Calibration timeseries has %d values, but modeled data only has %d.\n" \
                                  % ( calibDays, len(tmpResults) ) +

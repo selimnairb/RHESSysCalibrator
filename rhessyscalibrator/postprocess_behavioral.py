@@ -53,6 +53,7 @@ from matplotlib.ticker import FuncFormatter
 from rhessysworkflows.rhessys import RHESSysOutput
 
 from rhessyscalibrator.calibrator import RHESSysCalibrator
+from rhessyscalibrator import postprocess
 from rhessyscalibrator.model_runner_db2 import *
 
 
@@ -400,17 +401,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         self.logger.debug("%d behavioral runs" % (numRuns,) )
         
         # Read observed data from file
-#         obsFile = open(obsFilePath, 'r')
-#         (obs_datetime, obs_data) = \
-#             RHESSysOutput.readObservedDataFromFile(obsFile)
-#         obsFile.close()
-#         obs = pd.Series(obs_data, index=obs_datetime)
         obs_all = pd.read_csv(obsFilePath, index_col=0, parse_dates=True)
-        obs = obs_all['streamflow']
+        obs = obs_all[postprocess.OBS_HEADER_STREAMFLOW]
         if end_date:
             obs = obs[:end_date]
-        
-        #self.logger.debug("Observed data: %s" % obs_data)
         
         likelihood = np.empty(numRuns)
         ysim = None
@@ -429,10 +423,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
                     continue
                 
                 tmpFile = open(tmpOutfile, 'r')
-                
+                 
                 (tmp_datetime, tmp_data) = \
                         RHESSysOutput.readColumnFromFile(tmpFile,
-                                                         "streamflow")
+                                                         "streamflow", startHour=0)
                 tmp_mod = pd.Series(tmp_data, index=tmp_datetime)
                 # Align timeseries to observed
                 (mod, obs) = tmp_mod.align(obs, join='inner')
@@ -519,15 +513,10 @@ class RHESSysCalibratorPostprocessBehavioral(object):
         self.logger.debug("%d behavioral runs" % (numRuns,) )
         
         # Read observed data from file
-        obsFile = open(obsFilePath, 'r')
-        (obs_datetime, obs_data) = \
-            RHESSysOutput.readObservedDataFromFile(obsFile)
-        obsFile.close()
-        obs = pd.Series(obs_data, index=obs_datetime)
+        obs_all = pd.read_csv(obsFilePath, index_col=0, parse_dates=True)
+        obs = obs_all[postprocess.OBS_HEADER_STREAMFLOW]
         if end_date:
             obs = obs[:end_date]
-        
-        self.logger.debug("Observed data: %s" % obs_data)
         
         numCols = len(cols)
         likelihood = np.empty(numRuns)
