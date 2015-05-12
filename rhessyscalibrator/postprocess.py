@@ -55,8 +55,6 @@ matplotlib.use('Agg') # Allow for running on machines without X servers
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from rhessysworkflows.rhessys import RHESSysOutput
-
 from rhessyscalibrator.calibrator import RHESSysCalibrator
 from rhessyscalibrator.model_runner_db2 import *
 
@@ -897,10 +895,6 @@ Run "%prog --help" for detailed description of all options
         rhessysPath = RHESSysCalibrator.getRhessysPath(basedir)
 
         # Read observed data from file
-#         obsFile = open(obsFilePath, 'r')
-#         (obs_datetime, obs_data) = \
-#             RHESSysOutput.readObservedDataFromFile(obsFile, logger=self.logger)
-#         obsFile.close()
         obs_all = pd.read_csv(obsFilePath, index_col=0, parse_dates=True)
 
         startDate = None
@@ -970,6 +964,8 @@ Run "%prog --help" for detailed description of all options
         elif options.period == 'monthly':
             #obsTs = obsTs.resample('M', how='sum')
             obsTs = obs_streamflow.resample('M', how='sum')
+        else:
+            obsTs = obs_streamflow
 
         try:
             calibratorDB = \
@@ -1013,26 +1009,17 @@ Run "%prog --help" for detailed description of all options
                         print "Output file %s for run %d not found or not readable, unable to calculate fitness statistics for this run" % (tmpOutfile, run.id)
                         continue
                     
-                    tmpFile = open(tmpOutfile, 'r')
+                    #tmpFile = open(tmpOutfile, 'r')
+                    mod = pd.read_csv(tmpOutfile, sep=' ', 
+                                      parse_dates={'date':[0,1,2]}, 
+                                      index_col=0)
                     
                     if options.add_streamflow_and_gw:
-                        (model_datetime, model_data) = \
-                            RHESSysOutput.readColumnFromFile(tmpFile, "streamflow")
-                        streamflow = numpy.array(model_data)
-                        tmpFile.seek(0)
-                        
-                        (model_datetime, model_data) = \
-                            RHESSysOutput.readColumnFromFile(tmpFile, "gw.Qout")
-                        gw_Qout = numpy.array(model_data)
-                        tmpResults = streamflow + gw_Qout
-                                                            
+                        tmpResults = mod['streamflow'] + mod['gw.Qout']                                  
                     else:
-                        (model_datetime, model_data) = \
-                            RHESSysOutput.readColumnFromFile(tmpFile,
-                                                             "streamflow")
-                        tmpResults = numpy.array(model_data)
+                        tmpResults = mod['streamflow']
                             
-                    tmpFile.close()
+                    #tmpFile.close()
             
                     # Make sure observed and modeled data are of the same extent
                     if calibDays > len(tmpResults):
@@ -1041,7 +1028,7 @@ Run "%prog --help" for detailed description of all options
                                  "You may have to specify an end date so that calibration and model time series align.")
                     modelStartIdx = None
                     modelEndIdx = None
-                    for (counter, tmpDate) in enumerate(model_datetime):
+                    for (counter, tmpDate) in enumerate(tmpResults.index):
                         if tmpDate.hour == startDate.hour and \
                             tmpDate.day == startDate.day and \
                             tmpDate.month == startDate.month and \
@@ -1059,25 +1046,26 @@ Run "%prog --help" for detailed description of all options
                     
                     # Make sure modeled output has the right amount of data
                     try:
-                        model_datetime[modelStartIdx]
-                        model_datetime[modelEndIdx]
+                        tmpResults[modelStartIdx]
+                        tmpResults[modelEndIdx]
                     except IndexError:
                         print("Length of time series for runid: %d differs from what is expected. Output dir: %s\n\nSkipping..." % (run.id, runOutput))
                         continue
                     
                     self.logger.debug("Runid: %d" % (run.id,) )    
                     self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
-                          (modelStartIdx, str(model_datetime[modelStartIdx]), tmpResults[modelStartIdx] ) )
+                        (modelStartIdx, str(tmpResults.index[modelStartIdx]), tmpResults[modelStartIdx] ) )
                     self.logger.debug("Model end idx: %d" % modelEndIdx)
                     self.logger.debug("Model end idx: %d, date: %s, value: %f" %
-                                      (modelEndIdx, str(model_datetime[modelEndIdx]), tmpResults[modelEndIdx]) )
+                        (modelEndIdx, str(tmpResults.index[modelEndIdx]), tmpResults[modelEndIdx]) )
                     
                     # Aggregate modeled data as needed
-                    modelTs = pd.Series(tmpResults[modelStartIdx:modelEndIdx], index=model_datetime[modelStartIdx:modelEndIdx])
                     if options.period == 'weekly':
-                        modelTs = modelTs.resample('W-SUN', how='sum')
+                        modelTs = tmpResults.resample('W-SUN', how='sum')
                     elif options.period == 'monthly':
-                        modelTs = modelTs.resample('M', how='sum')
+                        modelTs = tmpResults.resample('M', how='sum')
+                    else:
+                        modelTs = tmpResults
                         
                     my_obs_data = obsTs
                     tmpResults = modelTs
