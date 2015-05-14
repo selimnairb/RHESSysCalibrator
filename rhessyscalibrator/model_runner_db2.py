@@ -904,7 +904,7 @@ job_id=?""",
         
         queryProto = "SELECT * FROM runfitness WHERE postprocess_id=?"
         if where_clause:
-            queryProto += " AND (" + where_clause + ")"
+            queryProto += " AND " + where_clause
             
         cursor.execute(queryProto, (postprocess_id,))
         for row in cursor:
