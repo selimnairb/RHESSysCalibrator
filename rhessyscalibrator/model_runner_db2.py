@@ -919,7 +919,6 @@ job_id=?""",
             
             # Get the actual run
             sub_cursor.execute("""SELECT * FROM run WHERE id=?""", (row['run_id'],))
-            print row['run_id']
             run_row = sub_cursor.fetchone()
             assert(run_row != None)
             run = self._runRecordToObject(run_row, run_fitness)
