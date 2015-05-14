@@ -149,7 +149,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             sys.exit("Unable to read project directory %s" % (options.basedir,) )
         self.basedir = os.path.abspath(options.basedir) 
             
-        self.logger.critical("parallel mode: %s" % options.parallel_mode)
+        self.logger.debug("parallel mode: %s" % options.parallel_mode)
         self.logger.debug("basedir: %s" % self.basedir)
         self.logger.debug("user: %s" % options.user)
         self.logger.debug("project: %s" % options.project)
@@ -204,7 +204,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             # Get runs in calibration session
             runs = self.calibratorDB.getRunsInPostProcess(postproc.id, where_clause=options.behavioral_filter)
             numRuns = len(runs)
-            print(notes)
+            print("\n{0}\n".format(notes))
             response = raw_input("%d runs selected of %d total runs (%.2f%%) in post process session %d, calibration session %d, continue? [yes | no] " % \
                                 (numRuns, calibItr, (float(numRuns) / float(calibItr)) * 100, options.postprocess_id, postproc.session_id ) )
             response = response.lower()
