@@ -1,3 +1,11 @@
+# 2.0.0 - 5/14/2015
+  - Introduced new database format allowing multiple post-processing 
+    results to be saved.
+  - Introduced CSV-based observed data format including datetime,
+    streamflow_mm, precip_mm columns.
+  - Add runoff ratio calculation for observered and modeled results
+    produced by rhessys_calibrator_postprocess.py
+
 # 1.0.32 - 4/28/2015
   - Add support for specifying calibration parameter ranges in cmd.proto.
 
