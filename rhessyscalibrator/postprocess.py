@@ -900,7 +900,6 @@ Run "%prog --help" for detailed description of all options
                                  options.startdate[3])
         else:
             # Set start data based on observed data
-            #startDate = obs_datetime[0]
             startDate = obs_all.index[0].to_datetime()
             
         if options.enddate:
@@ -914,7 +913,6 @@ Run "%prog --help" for detailed description of all options
                          (str(endDate), str(startDate) ) )
         else:
             # Set end date based on observed data
-            #endDate = obs_datetime[-1]
             endDate = obs_all.index[-1].to_datetime()
 
         # Determine start and end indices
@@ -948,6 +946,10 @@ Run "%prog --help" for detailed description of all options
                           (obsEndIdx, 
                            str(obs_streamflow.index[obsEndIdx]), 
                            obs_streamflow[obsEndIdx] ) )
+
+        # Determine observed runoff ratio
+        obs_runoff_ratio = numpy.sum( obs_all[obsStartIdx:obsEndIdx][OBS_HEADER_STREAMFLOW] ) / \
+                           numpy.sum( obs_all[obsStartIdx:obsEndIdx][OBS_HEADER_PRECIP] )
 
         # Aggregate observed data as needed
         #obsTs = pd.Series(obs_data[obsStartIdx:obsEndIdx], index=obs_datetime[obsStartIdx:obsEndIdx])
@@ -991,7 +993,8 @@ Run "%prog --help" for detailed description of all options
                         # Create postprocess entry to store all run fitness data in ...
                         postprocID = calibratorDB.insertPostProcess(session.id,
                                                                     options.observed_file,
-                                                                    options.period)
+                                                                    options.period,
+                                                                    obs_runoff_ratio=obs_runoff_ratio)
                         
                     runOutput = os.path.join(rhessysPath, run.output_path)
                     self.logger.debug(">>>\nOutput dir of run %d is %s" %
@@ -1012,7 +1015,7 @@ Run "%prog --help" for detailed description of all options
                         tmpResults = mod['streamflow']
                             
                     # Make sure observed and modeled data are of the same extent
-                    # Don't use panda's alignment as this doesn't work correctly in come versions
+                    # Don't use panda's alignment as this doesn't work correctly in some versions
                     if calibDays > len(tmpResults):
                         sys.exit("Calibration timeseries has %d values, but modeled data only has %d.\n" \
                                  % ( calibDays, len(tmpResults) ) +
@@ -1042,6 +1045,9 @@ Run "%prog --help" for detailed description of all options
                     except IndexError:
                         print("Length of time series for runid: %d differs from what is expected. Output dir: %s\n\nSkipping..." % (run.id, runOutput))
                         continue
+                    
+                    runoff_ratio = numpy.sum( mod[modelStartIdx:modelEndIdx]['streamflow'] ) / \
+                                   numpy.sum( mod[modelStartIdx:modelEndIdx]['precip'])
                     
                     self.logger.debug("Runid: %d" % (run.id,) )    
                     self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
@@ -1090,8 +1096,9 @@ Run "%prog --help" for detailed description of all options
                     # Store fitness parameters for this run
                     calibratorDB.insertRunFitnessResults(postprocID,
                                                          run.id,
-                                                         my_nse,
-                                                         my_nse_log)
+                                                         nse=my_nse,
+                                                         nse_log=my_nse_log,
+                                                         runoff_ratio=runoff_ratio)
                     
                     # Store performance parameters for this run so we can plot later
                     self.recordPlotDataForRun(run, my_nse, my_nse_log)
