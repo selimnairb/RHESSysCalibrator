@@ -95,20 +95,21 @@ Next, if the RHESSys model you wish to calibrate was created using RHESSysWorkfl
     
 If you are not working from a RHESSysWorkflows project, you will need to copy the necessary model files into the [correct locations](#model-directory-structure) in your calibration directory.
     
-Lastly, copy observed daily streamflow data for your watershed into the *obs* directory of your RHESSysCalibrator project, for example:
+Lastly, copy observed daily streamflow and precipitation data for your watershed into the *obs* directory of your RHESSysCalibrator project, for example:
 
     cp PATH/TO/MY_OBSERVED_DATA MY_CALIBRATION_PROJECT/obs
     
-Note that format as observered daily streamflow data should be the same as RHESSys climate daily timeseries, for example:
+Note that format for observered data must be a CSV file including the following columnsl:
 
-    1978 1 1 1
-    0.5
-    1.4
-    0.6
+    datetime,streamflow_mm,precip_mm
+    1/1/1991,3.7,0
+    1/2/1991,3.5,0
+    1/3/1991,3.51,8.4
+    1/4/1991,3.32,0.5
+    1/5/1991,3.21,0
     ...
     
-That is, the header is the begin year, month, day, and hour (typically 1) of the streamflow data timeseries, with one datum on each line in units of mm/day.  Make sure
-your line endings are Unix, not Windows or Mac. 
+The datetime column must contain the data in MM/DD/YYYY format.  Streamflow and precipitation data must be in units of mm/day; streamflow must be in a column named "streamflow_mm", precipitation in a column named "precip_mm".  Make sure your line endings are Unix, not Windows or Mac. 
     
 ## Configuring a calibration session
 RHESSysCalibrator uses a file called *cmd.proto* to control how calibration runs are created.  The typical contents of this file is:
@@ -221,13 +222,32 @@ After the calibration session finishes (i.e. once all the model runs have comple
     
 The *-s* option specifies the calibration session for which we wish to calculate fitness parameters; typically session is *2* is our first realy calibration session as the first session was our testing session.  Here we also specify the end date of the time period over which we wish to calculate fitness parameters; this is done using the *--enddate* option.  Note that you can also specify the temporal aggregation with which to calculate fitness parameters using the *-p* (a.k.a. *--period*) option.  The default is 'daily', but 'weekly' and 'monthly' are also supported.  The *--figureX* and *--figureY* options control the X and Y dimensions (in inches) of output plots.
 
-Once post-processing is finished, the sensitivity of each parameter will be illustrated in "dotty plot" figure output as PNG file named *dotty_plots_SESSION_2_daily.png* stored in the calibration project directory.
-    
-You can see the parameters used for each calibration run, as well as the fitness values for each run, by opening the calibration SQLite database stored in the calibration project.  We recommend that you use the SQLite Manager add-on in the FireFox web browser to do so.  The calibration database for our project can be found here:
+Once post-processing is finished, the following message will be printed:
 
-    MY_CALIBRATION_PROJECT/db/calibration.db
+    Fitness results saved to post-process session: N
     
-Using SQLite Manager, you can view calibration parameters and model fitness statistics, determin the model command line and output location for each model run, as well as export model run information to CSV files suitable for importing into data analysis tools.
+where "N" is the number of the post-process session just created for your calibration session; remember this number.  The sensitivity of each parameter will be illustrated in "dotty plot" figure output as PDF file named *dotty_plots_SESSION_2_POSTPROCESS_1_daily.pdf* stored in the calibration project directory.
+    
+You can see the parameters used for each calibration run, as well as the fitness values for each run, by opening the calibration SQLite database stored in the calibration project.  We recommend that you use the SQLite Manager add-on in the FireFox web browser to do so, though you can use any tool that can read SQLite version 3 databases.  The calibration database for our project can be found here:
+
+    MY_CALIBRATION_PROJECT/db/calibration.sqlite
+    
+> If you are working with a database originally created in RHESSysCalibrator 1.0, the filename will be *calibration.db* instead.
+    
+Using SQLite Manager, you can view calibration parameters and model fitness statistics, determine the model command line and output location for each model run.  The name and purpos of the most important tables are as follows:
+
+Table | Data stored
+--- | --- 
+session | General information, one entry each time *rhessys_calibrator* or *rhessys_calibrator_behavioral* is run.
+run | Detailed information about each model run in a session, multiple runs are associated with each session.
+postprocess | General post-process information, one entry for each time *rhessys_calibrator_postprocess* or *rhessys_calibrator_behavioral* is run.
+runfitness | Detailed run fitness information for a given model run, multiple runfitness entries are associated with each postprocess session. 
+
+To export model run information to CSV files suitable for importing into data analysis tools, you can use the *rhessys_calibrator_postprocess_export* tool:
+
+    rhessys_calibrator_postprocess_export.py -b MY_CALIBRATION_PROJECT -s N -f mypreferred_filename.csv
+
+where "N" is the number of the post-process session output by *rhessys_calibrator_postprocess*.
 
 ## Performing GLUE uncertainty estimation
 Once you have a suite of model realizations from a calibration session, RHESSysCalibrator can also facilitate simple uncertainty analysis using the Generalized Likelihood Uncertainty Estimation methodology (GLUE; Beven & Binley 1992).  
@@ -235,24 +255,28 @@ Once you have a suite of model realizations from a calibration session, RHESSysC
 ### Applying behavioral parameter sets to another RHESSys model
 The *rhessys_calibrator_behavioral* command will allow you to apply so-called behavioral model parameters from a previous calibration session to a new behavioral session representing a particular model scenario (e.g. a change in land cover from forest to suburban development; climate change scenarios, etc.). 
 
-The following invocation of *rhessys_calibrator_behavioral* will apply the top 100 model realizations, sorted in descending order by NSE-log then NSE, from calibration session 2 to a new behavioral RHESSysCalibrator project (make sure to copy the calibration.db from the calibration project into the behavioral project), for LSF-based clusters:
+The following invocation of *rhessys_calibrator_behavioral* will apply the top 100 model realizations, sorted in descending order by NSE-log then NSE, from post-process session 2 to a new behavioral RHESSysCalibrator project (make sure to copy the calibration.sqlite from the calibration project into the behavioral project), for LSF-based clusters:
 
-    rhessys_calibrator_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -p 'Behavioral runs for My RHESSys model' -s 2 -c cmd.proto -j 100 --parallel_mode lsf --mem_limit M -q QUEUE_NAME -f "session_id=2 order by nse_log desc, nse desc limit 100"
+    rhessys_calibrator_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -p 'Behavioral runs for My RHESSys model' -s 2 -c cmd.proto -j 100 --parallel_mode lsf --mem_limit M -q QUEUE_NAME -f "postprocess_id=2 order by nse_log desc, nse desc limit 100"
     
 or for PBS/TORQUE-based clusters:
 
-    rhessys_calibrator_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -p 'Behavioral runs for My RHESSys model' -s 2 -c cmd.proto -j 100 --parallel_mode pbs --mem_limit M --wall_time W -f "session_id=2 order by nse_log desc, nse desc limit 100"
+    rhessys_calibrator_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -p 'Behavioral runs for My RHESSys model' -s 2 -c cmd.proto -j 100 --parallel_mode pbs --mem_limit M --wall_time W -f "postprocess_id=2 order by nse_log desc, nse desc limit 100"
     
 Note that to allow the time period for uncertainty estimation of behavioral simulations to differ from that of the calibration session, we can specify a particular *cmd.proto* to use, which may or may not be the same as the *cmd.proto* used for the calibration session.
 
 > The *-f* option can be any valid SQLite "WHERE" clause.
 
+When the behavioral runs complete *rhessys_calibrator_behavioral* will print out the number of the calibration session and post-process session created, e.g.:
+
+    Behavioral results saved to session 3, post-process session 2
+
+Take note of these for future reference in the visualization section below.
+
 ### Visualizing behavioral model output
 Once the behavioral simulations are complete, you can visualize the uncertainty around estimates of streamflow using the *rhessys_calibrator_postprocess_behavioral* command:
 
-    rhessys_calibrator_postprocess_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -s 3 --behavioral_filter "session_id=3" -of PDF --figureX 8 --figureY 3 --supressObs --plotWeightedMean
-
-> Note that each behavioral session will create a new session in your calibration.db.
+    rhessys_calibrator_postprocess_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -s 2 -of PDF --figureX 8 --figureY 3 --supressObs --plotWeightedMean
 
 For a full list of options, run:
 
@@ -265,7 +289,7 @@ You can use the *rhessys_calibrator_postprocess_behavioral_compare* command to c
     
     rhessys_calibrator_postprocess_behavioral_compare.py MY_BEHAVIORAL_CALIBRATION_PROJECT_1 MY_BEHAVIORAL_CALIBRATION_PROJECT_2 3 4 -t "Model scenario 1 vs. scenario 2 - 95% uncertainty bounds" -of PDF --figureX 8 --figureY 3 --plotWeightedMean --legend "Scenario 1" "Scenario 2" --behavioral_filter "nse>0 order by nse_log desc, nse desc limit 100"  --supressObs --color	
 	
-Here we are telling RHESSysCalibrator that we would like to plot the weighted ensemble mean (Seibert & Beven 2009) with the *--plotWeightedMean* option. Note that *MY_BEHAVIORAL_CALIBRATION_PROJECT_1* and *MY_BEHAVIORAL_CALIBRATION_PROJECT_2* could be the same behavior RHESSysCalibrator project.  
+Here we are telling RHESSysCalibrator that we would like to compare post-process sessions 3 and 4, plotting the weighted ensemble mean (Seibert & Beven 2009) with the *--plotWeightedMean* option. Note that *MY_BEHAVIORAL_CALIBRATION_PROJECT_1* and *MY_BEHAVIORAL_CALIBRATION_PROJECT_2* could be the same RHESSysCalibrator project.  
 
 *rhessys_calibrator_postprocess_behavioral_compare* will perform a Kolmogorov-Smirnov (K-S) test to determine if the weighted ensemble mean streamflow time series from the behavioral runs are statistically significant.  Here is some example output:
 
@@ -283,7 +307,9 @@ Which indicates that there is no statistically significant difference between th
 ### Visualizing behavioral model output using other tools
 If you would like to visualize behavioral streamflow data using other analysis or visualization tools, you can use the *rhessys_calibrator_postprocess_behavioral_timeseries* command to out output: min, max, median, mean, and weighted ensemble mean time series:
 
-	rhessys_calibrator_postprocess_behavioral_timeseries.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -s 3 --behavioral_filter "session_id=3"
+	rhessys_calibrator_postprocess_behavioral_timeseries.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -s 3
+
+where the *-s* or *--postprocess_session* option refers to the post-process session created for your behavioral run by *rhessys_calibrator_behavioral*.
 	
 Then, for example, you can use RHESSysWorkflow's *RHESSysPlot* command to make scatter plots of streamflow for two behavioral sessions:
 
