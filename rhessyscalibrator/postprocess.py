@@ -813,11 +813,13 @@ Run "%prog --help" for detailed description of all options
 
         parser.add_option("-d", "--startdate", type="int", nargs=4,
                           dest="startdate", 
-                          help="[OPTIONAL] Date from which to start fitness calculations, of format YYYY M D H")
+                          help="[OPTIONAL] Date from which to start fitness calculations, of format YYYY M D H. " + \
+                               "Note: Hour must be specified for backward compatibility and will be ignored, hour will be set to 0:00.")
 
         parser.add_option("--enddate", type=int, nargs=4,
                           dest="enddate",
-                          help="[OPTIONAL] Date on which to end fitness calculationss, of format YYYY M D H")
+                          help="[OPTIONAL] Date on which to end fitness calculationss, of format YYYY M D H. " + \
+                               "Note: Hour must be specified for backward compatibility and will be ignored, hour will be set to 0:00.")
 
         parser.add_option("-p", "--period",
                           dest="period", choices=['daily', 'weekly', 'monthly'], default='daily',
@@ -897,7 +899,7 @@ Run "%prog --help" for detailed description of all options
             startDate = datetime(options.startdate[0],
                                  options.startdate[1],
                                  options.startdate[2],
-                                 options.startdate[3])
+                                 0)
         else:
             # Set start data based on observed data
             startDate = obs_all.index[0].to_datetime()
@@ -907,57 +909,25 @@ Run "%prog --help" for detailed description of all options
             endDate = datetime(options.enddate[0],
                                options.enddate[1],
                                options.enddate[2],
-                               options.enddate[3])
+                               0)
             if not endDate > startDate:
                 sys.exit("End date %s is not greater than start date %s" % \
                          (str(endDate), str(startDate) ) )
         else:
             # Set end date based on observed data
             endDate = obs_all.index[-1].to_datetime()
-
-        # Determine start and end indices
-        delta = endDate - startDate
-        calibDays = delta.days
-            
-        obsStartIdx = None
-        obsEndIdx = None
-        for (counter, tmpDate) in enumerate(obs_all.index):
-            if tmpDate.hour == startDate.hour and \
-                tmpDate.day == startDate.day and \
-                tmpDate.month == startDate.month and \
-                tmpDate.year == startDate.year:
-                obsStartIdx = counter
-                obsEndIdx = obsStartIdx + calibDays
-                break
         
-        if obsStartIdx == None:
-            sys.exit("Unable to find start date %s in observed data %s" %
-                     (str(startDate), obsFilePath) )
-        if obsEndIdx == None:
-            sys.exit("Unable to find end date %s in observed data %s" %
-                     (str(endDate), obsFilePath) )
-        
+        obs_all = obs_all[startDate:endDate]
         obs_streamflow = obs_all[OBS_HEADER_STREAMFLOW]
-        self.logger.debug("Obs start idx: %d, date: %s, value: %f" % 
-                          (obsStartIdx, 
-                           str(obs_streamflow.index[obsStartIdx]), 
-                           obs_streamflow[obsStartIdx] ) )
-        self.logger.debug("Obs end idx: %d, date: %s, value: %f" % 
-                          (obsEndIdx, 
-                           str(obs_streamflow.index[obsEndIdx]), 
-                           obs_streamflow[obsEndIdx] ) )
 
         # Determine observed runoff ratio
-        obs_runoff_ratio = numpy.sum( obs_all[obsStartIdx:obsEndIdx][OBS_HEADER_STREAMFLOW] ) / \
-                           numpy.sum( obs_all[obsStartIdx:obsEndIdx][OBS_HEADER_PRECIP] )
+        obs_runoff_ratio = numpy.sum( obs_all[OBS_HEADER_STREAMFLOW] ) / \
+                           numpy.sum( obs_all[OBS_HEADER_PRECIP] )
 
         # Aggregate observed data as needed
-        #obsTs = pd.Series(obs_data[obsStartIdx:obsEndIdx], index=obs_datetime[obsStartIdx:obsEndIdx])
         if options.period == 'weekly':
-            #obsTs = obsTs.resample('W-SUN', how='sum')
             obsTs = obs_streamflow.resample('W-SUN', how='sum')
         elif options.period == 'monthly':
-            #obsTs = obsTs.resample('M', how='sum')
             obsTs = obs_streamflow.resample('M', how='sum')
         else:
             obsTs = obs_streamflow
@@ -1008,53 +978,30 @@ Run "%prog --help" for detailed description of all options
                     mod = pd.read_csv(tmpOutfile, sep=' ', 
                                       parse_dates={'date':[0,1,2]}, 
                                       index_col=0)
+                    mod = mod[startDate:endDate]
                     
                     if options.add_streamflow_and_gw:
                         tmpResults = mod['streamflow'] + mod['gw.Qout']                                  
                     else:
                         tmpResults = mod['streamflow']
-                            
+                      
                     # Make sure observed and modeled data are of the same extent
                     # Don't use panda's alignment as this doesn't work correctly in some versions
-                    if calibDays > len(tmpResults):
+                    if len(obs_all) > len(tmpResults):
                         sys.exit("Calibration timeseries has %d values, but modeled data only has %d.\n" \
-                                 % ( calibDays, len(tmpResults) ) +
+                                 % ( len(obs_all), len(tmpResults) ) +
                                  "You may have to specify an end date so that calibration and model time series align.")
-                    modelStartIdx = None
-                    modelEndIdx = None
-                    for (counter, tmpDate) in enumerate(tmpResults.index):
-                        if tmpDate.hour == startDate.hour and \
-                            tmpDate.day == startDate.day and \
-                            tmpDate.month == startDate.month and \
-                            tmpDate.year == startDate.year:
-                            modelStartIdx = counter
-                            modelEndIdx = modelStartIdx + (calibDays - 1)
-                            break 
+                    if mod.index[0] != obs_all.index[0]:
+                        msg = "Aligned model start date {mod_st} does not equal the observed start date {obs_st}"
+                        sys.exit(msg.format(mod_st=mod.index[0],
+                                            obs_st=obs_all.index[0]))
+                    if mod.index[-1] != obs_all.index[-1]:
+                        msg = "Aligned model end date {mod_ed} does not equal the observed end date {obs_ed}"
+                        sys.exit(msg.format(mod_ed=mod.index[-1],
+                                            obs_ed=obs_all.index[-1]))
                     
-                    if modelStartIdx == None:
-                        sys.exit("Unable to find start date %s in model data %s" %
-                                 (str(startDate), tmpOutfile) )
-                    if modelEndIdx == None:
-                        sys.exit("Unable to find end date %s in model data %s" %
-                                 (str(endDate), tmpOutfile) )
-                    
-                    # Make sure modeled output has the right amount of data
-                    try:
-                        tmpResults[modelStartIdx]
-                        tmpResults[modelEndIdx]
-                    except IndexError:
-                        print("Length of time series for runid: %d differs from what is expected. Output dir: %s\n\nSkipping..." % (run.id, runOutput))
-                        continue
-                    
-                    runoff_ratio = numpy.sum( mod[modelStartIdx:modelEndIdx]['streamflow'] ) / \
-                                   numpy.sum( mod[modelStartIdx:modelEndIdx]['precip'])
-                    
-                    self.logger.debug("Runid: %d" % (run.id,) )    
-                    self.logger.debug("Model start idx: %d, date: %s, value: %f" % 
-                        (modelStartIdx, str(tmpResults.index[modelStartIdx]), tmpResults[modelStartIdx] ) )
-                    self.logger.debug("Model end idx: %d" % modelEndIdx)
-                    self.logger.debug("Model end idx: %d, date: %s, value: %f" %
-                        (modelEndIdx, str(tmpResults.index[modelEndIdx]), tmpResults[modelEndIdx]) )
+                    runoff_ratio = numpy.sum( mod['streamflow'] ) / \
+                                   numpy.sum( mod['precip'])
                     
                     # Aggregate modeled data as needed
                     if options.period == 'weekly':
@@ -1066,16 +1013,7 @@ Run "%prog --help" for detailed description of all options
                         
                     my_obs_data = obsTs
                     tmpResults = modelTs
-                    
-                    if len(my_obs_data) > len(tmpResults):
-                        my_obs_data = my_obs_data[:len(tmpResults)]
-                    elif len(my_obs_data) < len(tmpResults):
-                        tmpResults = tmpResults[:len(my_obs_data)]
-                    assert(len(my_obs_data) == len(tmpResults))
-                    
-                    self.logger.debug("First obs value: %f, last: %f" % (my_obs_data[0], my_obs_data[-1]) )
-                    self.logger.debug("First modeled value: %f, last: %f" % (tmpResults[0], tmpResults[-1]) )
-                    
+                                       
                     # Calculate NSE
                     my_nse = \
                         RHESSysCalibratorPostprocess.calculateNSE(my_obs_data,
