@@ -987,8 +987,8 @@ Run "%prog --help" for detailed description of all options
                       
                     # Make sure observed and modeled data are of the same extent
                     # Don't use panda's alignment as this doesn't work correctly in some versions
-                    if len(obs_all) > len(tmpResults):
-                        sys.exit("Calibration timeseries has %d values, but modeled data only has %d.\n" \
+                    if len(obs_all) != len(tmpResults):
+                        sys.exit("Calibration timeseries has %d values, but modeled data has %d.\n" \
                                  % ( len(obs_all), len(tmpResults) ) +
                                  "You may have to specify an end date so that calibration and model time series align.")
                     if mod.index[0] != obs_all.index[0]:
