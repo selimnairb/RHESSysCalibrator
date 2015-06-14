@@ -1,3 +1,9 @@
+# 2.0.1 - 6/13/2015
+  - Simplify observed and modeled timeseries alignment code in 
+    rhessys_calibrator_postprocess.py to fix cases where timeseries would 
+    not properly align.
+  - Make covariance plot output optional in rhessys_calibrator_postprocess.py.
+
 # 2.0.0 - 5/14/2015
   - Introduced new database format allowing multiple post-processing 
     results to be saved.
