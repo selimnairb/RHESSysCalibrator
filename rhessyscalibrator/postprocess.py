@@ -841,6 +841,9 @@ Run "%prog --help" for detailed description of all options
                           dest="figureDPI", default=80,
                           help="[OPTIONAL] DPI of dotty plot figure")
         
+        parser.add_option("--covplot", action="store_true", default=False,
+                          help="[OPTIONAL] Write experimental co-variance plot.")
+        
         (options, args) = parser.parse_args()
 
         # Enforce initial command line options rules
@@ -1050,9 +1053,10 @@ Run "%prog --help" for detailed description of all options
                                    sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
                 
                 # Generate and save covariance plot
-                covFilename = "cov_plots_SESSION_%s_POSTPROCESS_%s_%s" % ( options.session_id, postprocID, options.period )
-                self.saveCovariancePlot(outdirPath, covFilename, format='PDF', 
-                                        sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
+                if options.covplot:
+                    covFilename = "cov_plots_SESSION_%s_POSTPROCESS_%s_%s" % ( options.session_id, postprocID, options.period )
+                    self.saveCovariancePlot(outdirPath, covFilename, format='PDF', 
+                                            sizeX=options.figureX, sizeY=options.figureY, dpi=options.figureDPI)
                 
                 print("\n\nFitness results saved to post-process session: {0}".format(postprocID))
         except:
