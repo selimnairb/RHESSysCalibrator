@@ -40,6 +40,20 @@ from random import *
 PARAM_REGEX_TEMPLATE = lambda v: """\s+(\$""" + v + """(\[(\d+(?:\.\d+){0,1}),\s*(\d+(?:\.\d+){0,1})\])?)\s*"""
 PARAM_INTERVAL_REGEX = '\[\d+(?:\.\d+){0,1},\s*\d+(?:\.\d+){0,1}\]\s*'
 
+PARAM_S1_KEY = 's1'
+PARAM_S2_KEY = 's2'
+PARAM_S3_KEY = 's3'
+PARAM_SV1_KEY = 'sv1'
+PARAM_SV2_KEY = 'sv2'
+PARAM_GW1_KEY = 'gw1'
+PARAM_GW2_KEY = 'gw2'
+PARAM_VGSEN1_KEY = 'vgsen1'
+PARAM_VGSEN2_KEY = 'vgsen2'
+PARAM_VGSEN3_KEY = 'vgsen3'
+PARAM_SVALT1_KEY = 'svalt1'
+PARAM_SVALT2_KEY = 'svalt2'
+
+
 class CalibrationParametersProto(object):
     """ Represents whether particular calibration parameters have been
         specified using boolean values
@@ -60,18 +74,18 @@ class CalibrationParametersProto(object):
         self.svalt1 = False
         self.svalt2 = False
         
-        self.parameterRanges = {'s1':[0.01, 20.0],
-                                's2':[1.0, 150.0],
-                                's3':[0.1, 10.0],
-                                'sv1':[0.01, 20.0],
-                                'sv2':[1.0, 150.0],
-                                'gw1':[0.001, 0.3],
-                                'gw2':[0.01, 0.9],
-                                'vgsen1':[0.5, 2.0],
-                                'vgsen2':[0.5, 2.0], 
-                                'vgsen3':[0.5, 2.0],
-                                'svalt1':[0.5, 2.0],
-                                'svalt2':[0.5, 2.0]}
+        self.parameterRanges = {PARAM_S1_KEY:[0.01, 20.0],
+                                PARAM_S2_KEY:[1.0, 150.0],
+                                PARAM_S3_KEY:[0.1, 10.0],
+                                PARAM_SV1_KEY:[0.01, 20.0],
+                                PARAM_SV2_KEY:[1.0, 150.0],
+                                PARAM_GW1_KEY:[0.001, 0.3],
+                                PARAM_GW2_KEY:[0.01, 0.9],
+                                PARAM_VGSEN1_KEY:[0.5, 2.0],
+                                PARAM_VGSEN2_KEY:[0.5, 2.0], 
+                                PARAM_VGSEN3_KEY:[0.5, 2.0],
+                                PARAM_SVALT1_KEY:[0.5, 2.0],
+                                PARAM_SVALT2_KEY:[0.5, 2.0]}
     
     def parseParameterString(self, param_string):
         """ Parse parameter string for presence and range of all possible calibration
