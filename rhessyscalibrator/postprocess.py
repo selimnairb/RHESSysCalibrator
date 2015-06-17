@@ -480,8 +480,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_S1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_S1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_S1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_S1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -492,8 +492,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_S1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_S1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_S1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_S1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 a.set_ylabel('N-S efficiency for log daily streamflow', fontsize='xx-small')
@@ -509,8 +509,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_S2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_S2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_S2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_S2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -521,8 +521,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_S2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_S2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_S2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_S2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -537,8 +537,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_S3_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_S3_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_S3_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_S3_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -549,8 +549,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_S3_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_S3_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_S3_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_S3_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -565,8 +565,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SV1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SV1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SV1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SV1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -577,8 +577,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SV1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SV1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SV1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SV1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -593,8 +593,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SV2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SV2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SV2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SV2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -605,8 +605,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SV2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SV2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SV2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SV2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -621,8 +621,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_GW1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_GW1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_GW1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_GW1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -633,8 +633,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_GW1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_GW1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_GW1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_GW1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
         
@@ -649,8 +649,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_GW2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_GW2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_GW2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_GW2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -661,8 +661,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_GW2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_GW2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_GW2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_GW2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -677,8 +677,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -689,8 +689,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_VGSEN1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
         
@@ -705,8 +705,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -717,8 +717,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_VGSEN2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
         
@@ -733,8 +733,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -745,8 +745,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_VGSEN3_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
         
@@ -761,8 +761,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SVALT1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SVALT1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SVALT1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SVALT1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -773,8 +773,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SVALT1_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SVALT1_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SVALT1_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SVALT1_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
                 
@@ -789,8 +789,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SVALT2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SVALT2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SVALT2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SVALT2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
             if 'nse_log' in self.plotData.keys():
@@ -801,8 +801,8 @@ class RHESSysCalibratorPostprocess(object):
                 a.locator_params(axis='x', nbins=4)
                 a.tick_params(labelsize=fontsize)
                 a.margins(1)
-                a.set_xlim(self.param_proto.parameterRanges[PARAM_SVALT2_KEY][0], 
-                           self.param_proto.parameterRanges[PARAM_SVALT2_KEY][1])
+                a.set_xlim(math.floor(self.param_proto.parameterRanges[PARAM_SVALT2_KEY][0]), 
+                           math.ceil(self.param_proto.parameterRanges[PARAM_SVALT2_KEY][1]))
                 a.set_ylim(0, 1)
                 a.scatter(x, y, facecolors='none', edgecolors='blue', linewidth='0.5')
         
