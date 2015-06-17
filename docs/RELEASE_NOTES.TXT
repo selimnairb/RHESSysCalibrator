@@ -1,3 +1,9 @@
+# 2.0.2 - 6/16/2015
+  - Update rhessys_calibrator_postprocess.py to set range of dotty
+    plot graphs based on parameter ranges specified in cmd.proto
+  - Fix bug in rhessys_calibrator_postprocess.py where date parsing 
+    for modeled data was incorrect.
+
 # 2.0.1 - 6/13/2015
   - Simplify observed and modeled timeseries alignment code in 
     rhessys_calibrator_postprocess.py to fix cases where timeseries would 
