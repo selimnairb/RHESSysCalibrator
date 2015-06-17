@@ -1056,7 +1056,7 @@ Run "%prog --help" for detailed description of all options
                         continue
                     
                     mod = pd.read_csv(tmpOutfile, sep=' ', 
-                                      parse_dates={'date':[0,1,2]}, 
+                                      parse_dates={'date':[2,1,0]}, 
                                       index_col=0)
                     mod = mod[startDate:endDate]
                     
