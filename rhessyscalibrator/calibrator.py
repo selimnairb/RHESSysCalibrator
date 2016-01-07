@@ -983,7 +983,7 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("--parallel_mode", action="store", 
                           type="string", dest="parallel_mode",
-                          help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], pbs, process")
+                          help="[OPTIONAL] set method to use for running jobs in parallel, one of: lsf [default], pbs, slurm, process")
 
         parser.add_option("--polling_delay", action="store",
                           type="int", dest="polling_delay",
