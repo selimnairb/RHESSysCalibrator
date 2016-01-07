@@ -772,7 +772,7 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
             that matches the job ID in group 1 and the job status 
             in group 2.
         """
-        return re.compile("^(\S+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s+\S+\s+\S+\s+\S+$")
+        return re.compile("^\s*(\S+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s+\S+\s+\S+\s+\S+\s*$")
     
     def mapStatusCode(self, status_code):
         """ Map between status codes of the underlying queue system
