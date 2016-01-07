@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='rhessyscalibrator',
-      version='2.0.2',
+      version='2.0.3-dev',
       description='Libraries and command-line scripts for handling RHESSys model calibration.',
       long_description=readme(),
       classifiers=[
