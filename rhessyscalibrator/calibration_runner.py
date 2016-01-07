@@ -375,7 +375,7 @@ class CalibrationRunnerQueue(CalibrationRunner):
             self.logger.debug('|' + line + '|')
             match = statusRegex.match(line)
             if None == match:
-                # Don't choke on header or blank lines of qstat output.
+                # Don't choke on header or blank lines of status command output.
                 continue
             job_id = match.group(1)
             run = self.db.getRunInSession(self.session_id, job_id)
@@ -715,6 +715,142 @@ class CalibrationRunnerPBS(CalibrationRunnerQueue):
         if None == match:
             raise Exception("Error while reading output from qsub:\ncmd: %s\n\n|%s|\n%s,\npattern: |%s|" %
                             (qsub_cmd, process_stdout, process_stderr, 
+                             self.getRunCmdRegex().pattern))
+        self.numActiveJobs += 1
+        job.job_id = match.group(1)
+        
+        if self.restart_runs:
+            # Ensure run to restart exists
+            run = self.db.getRun(job.id)
+            if run is None:
+                raise Exception("Run %d does not exist and cannot be restarted" % (job.id,) )
+            # Update job_id
+            self.db.updateRunJobId(job.id, job.job_id)
+        else:
+            # New run, store in DB
+            self.storeJobInDB(job)
+            
+        self.logger.critical("Run %s submitted as job %s" % 
+                             (job.id, job.job_id))
+
+class CalibrationRunnerSLURM(CalibrationRunnerQueue):
+    """ CalibrationRunner for use with SLURM job management system.
+
+    """
+    # Map SLURM job status codes to our own status codes
+    STATUS_MAP = {'PD': 'PEND', 'CF': 'PEND', 
+                  'R': 'RUN', 'CG': 'RUN',
+                  'W': 'WAIT', 'PR': 'WAIT',
+                  'CD': 'DONE', 
+                  'F': 'EXIT', 'CA': 'EXIT', 'BF': 'EXIT', 'NF': 'EXIT',
+                  'PR': 'EXIT', 'TO': 'EXIT', 'SE': 'EXIT',
+                  'S': 'SSUSP'
+                  }
+    
+    def getRunCmd(self, *args, **kwargs):
+        """ Get job submission command given selected options
+         
+            @return String representing job submission command
+        """
+        return "sbatch"
+    
+    def getRunStatusCmd(self, *args, **kwargs):
+        """ Get job status command
+        
+            @return String representing job status command
+        """
+        return "squeue"
+    
+    def getRunCmdRegex(self):
+        """ Get compiled regular expression for parsing run command output
+        """
+        return re.compile("^Submitted batch job ([0-9]+)$")
+    
+    def getRunStatusCmdRegex(self):
+        """ Get compiled regular expression for parsing run status 
+            command output.  Concrete classes must return a regex
+            that matches the job ID in group 1 and the job status 
+            in group 2.
+        """
+        return re.compile("^(\S+)\s+\S+\s+\S+\s+\S+\s+(\S+)\s+\S+\s+\S+\s+\S+$")
+    
+    def mapStatusCode(self, status_code):
+        """ Map between status codes of the underlying queue system
+            and calibrator status codes
+            
+            @param status_code String representing status code of underlying 
+                queue system
+            
+            @return String representing calibrator status code 
+        """
+        return self.STATUS_MAP[status_code]
+
+    def __init__(self, basedir, session_id, queue, 
+                 db_path, run_path, logger, restart_runs,
+                 submit_queue, polling_delay, mem_limit, max_active_jobs,
+                 wall_time):
+        super(CalibrationRunnerPBS, self).__init__(basedir, session_id, queue, 
+                 db_path, run_path, logger, restart_runs,
+                 submit_queue, polling_delay, mem_limit, max_active_jobs)
+        
+        self.run_cmd = self.getRunCmd()
+        self.run_status_cmd = self.getRunStatusCmd()
+        
+        self.wall_time = wall_time
+        
+    def submitJob(self, job):
+        """ Submit a job to the underlying queue system.  
+        
+            @note Will add job to calibration DB.
+            
+            @param job model_runner_db.ModelRun representing the job to run
+            
+            @raise Exception if run status command output is not what was 
+            expected
+        """
+        # Make script for running this model run
+        script_filename = os.path.abspath(os.path.join(self.run_path, 
+                                                       job.output_path, 'pbs.script'))
+        script = open(script_filename, 'w')
+        script.write('#!/bin/sh\n\n')
+        script.write('#SBATCH --job-name=RHESSysCalibrator')
+        script.write('#SBATCH --nodes 1-1\n')
+        script.write('#SBATCH -n 1')
+        script.write("#SBATCH --partition {partition}".format(partition=self.submit_queue))
+        if self.mem_limit:
+            script.write("#SBATCH --mem-per-cpu={mem_limit}\n".format(mem_limit=(self.mem_limit*1024)))
+        if self.wall_time:
+            script.write("#SBATCH --time={0}:00:00\n".format(self.wall_time)) # Try to get by without specifying this
+        script.write('\n')
+        script.write(job.cmd_raw)
+        script.write('\n')
+        script.close()
+        os.chmod(script_filename, 
+                 stat.S_IWUSR | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        
+        # Build qsub command line
+        stdout_file = os.path.abspath(os.path.join(self.run_path, 
+                                                   job.output_path, 'pbs.out'))
+        stderr_file = os.path.abspath(os.path.join(self.run_path,
+                                                   job.output_path, 'pbs.err'))
+        sbatch_cmd = self.run_cmd
+        sbatch_cmd += ' -o ' + stdout_file + ' -e ' + stderr_file
+        sbatch_cmd += ' ' + script_filename
+        
+        # Run sbatch
+        self.logger.debug("Running sbatch: %s from path: %s" % (sbatch_cmd, self.run_path))
+        process = Popen(sbatch_cmd, shell=True, stdout=PIPE, stderr=PIPE,
+                        cwd=self.run_path, bufsize=1)
+        
+        (process_stdout, process_stderr) = process.communicate()    
+        
+        # Read job id from sbatch outupt (e.g. "<Job ID>")
+        self.logger.critical("stdout from sbatch: %s" % process_stdout)
+        self.logger.critical("stderr from sbatch: %s" % process_stderr)
+        match = self.getRunCmdRegex().match(process_stdout)
+        if None == match:
+            raise Exception("Error while reading output from sbatch:\ncmd: %s\n\n|%s|\n%s,\npattern: |%s|" %
+                            (sbatch_cmd, process_stdout, process_stderr, 
                              self.getRunCmdRegex().pattern))
         self.numActiveJobs += 1
         job.job_id = match.group(1)
