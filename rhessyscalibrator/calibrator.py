@@ -2,13 +2,13 @@
 
 @brief A system for managing calibration sessions and run of RHESSys.
 @brief Can by run on laptop/workstation using multiple processors or
-on a cluster that runs LSF (by Platform Computing, Inc.) for job 
-management.
+on a cluster that runs LSF (by Platform Computing, Inc.), PBS/TORQUE,
+or SLURM for job management.
 
 This software is provided free of charge under the New BSD License. Please see
 the following license information:
 
-Copyright (c) 2013-2015, University of North Carolina at Chapel Hill
+Copyright (c) 2013-2016, University of North Carolina at Chapel Hill
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -53,9 +53,11 @@ from rhessyscalibrator.calibration_parameters import *
 # Constants
 PARALLEL_MODE_LSF = 'lsf'
 PARALLEL_MODE_PBS = 'pbs'
+PARALLEL_MODE_SLURM = 'slurm'
 PARALLEL_MODE_PROCESS = 'process'
 PARALLEL_MODES = [PARALLEL_MODE_LSF, 
                   PARALLEL_MODE_PBS, 
+                  PARALLEL_MODE_SLURM,
                   PARALLEL_MODE_PROCESS]
 DEFAULT_PARALLEL_MODE = PARALLEL_MODE_LSF
 
@@ -143,6 +145,19 @@ class RHESSysCalibrator(object):
                                                 simulator_path)
             elif PARALLEL_MODE_PBS == parallel_mode:
                 consumer = CalibrationRunnerPBS(basedir,
+                                                session_id,
+                                                runQueue,
+                                                RHESSysCalibrator.getDBPath(basedir),
+                                                RHESSysCalibrator.getRhessysPath(basedir),
+                                                logger,
+                                                restart_runs,
+                                                queue_name,
+                                                polling_delay,
+                                                mem_limit,
+                                                num_processes,
+                                                wall_time)
+            elif PARALLEL_MODE_SLURM == parallel_mode:
+                consumer = CalibrationRunnerSLURM(basedir,
                                                 session_id,
                                                 runQueue,
                                                 RHESSysCalibrator.getDBPath(basedir),
@@ -963,7 +978,7 @@ obs/                       Where you will store observed data to be compared to
 
         parser.add_option("-q", "--queue", action="store",
                           type="string", dest="queue_name",
-                          help="[OPTIONAL] set queue name to submit jobs to using the underlying queue manager.  " +
+                          help="[OPTIONAL] set queue/partition name to submit jobs to using the underlying queue manager.  " +
                                "Applies only to non-process-based calibration runners (specified by parallel_mode option).")
 
         parser.add_option("--parallel_mode", action="store", 
@@ -989,7 +1004,7 @@ obs/                       Where you will store observed data to be compared to
         
         parser.add_option("--wall_time", action="store",
                           type="int", dest="wall_time",
-                          help="[OPTIONAL] For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
+                          help="[OPTIONAL] For PBS- and SLURM-based parallel modes: Specify wall time in hours that jobs should take.")
 
         (options, args) = parser.parse_args()
 
@@ -1049,15 +1064,17 @@ with the calibration session""")
 
         assert( (PARALLEL_MODE_LSF == options.parallel_mode) or 
                 (PARALLEL_MODE_PBS == options.parallel_mode) or
+                (PARALLEL_MODE_SLURM == options.parallel_mode) or
                 (PARALLEL_MODE_PROCESS == options.parallel_mode))
 
-        if options.parallel_mode == PARALLEL_MODE_LSF and not options.queue_name:
-            parser.error("""Please specify a queue name that is valid for your system.""")
+        if options.parallel_mode != PARALLEL_MODE_PROCESS and not options.queue_name:
+            parser.error("""Please specify a queue/partition name that is valid for your system.""")
         
         wall_time = None
-        if options.parallel_mode == PARALLEL_MODE_PBS and options.wall_time:
-            if options.wall_time < 1 or options.wall_time > 168:
-                parser.error("Wall time must be greater than 0 and less than 169 hours")
+        if options.wall_time:
+            if options.parallel_mode == PARALLEL_MODE_PBS or options.parallel_mode == PARALLEL_MODE_SLURM:
+                if options.wall_time < 1 or options.wall_time > 168:
+                    parser.error("Wall time must be greater than 0 and less than 169 hours")
             wall_time = options.wall_time
         
         if not options.polling_delay:
@@ -1259,7 +1276,7 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
                             help="For non-process based parallel modes: Specify memory limit for jobs.  Unit: gigabytes  Defaults to 4.")
         parser.add_argument("--wall_time", action="store",
                             type=int, dest="wall_time",
-                            help="For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
+                            help="For PBS- and SLURM-based parallel mode: Specify wall time in hours that jobs should take.")
 
 
         args = parser.parse_args()
@@ -1276,12 +1293,13 @@ class RHESSysCalibratorRestart(RHESSysCalibrator):
             self._initLogger(logging.INFO)
         
         if args.parallel_mode != PARALLEL_MODE_PROCESS and not args.queue_name:
-            sys.exit("""Please specify a queue name that is valid for your system.""")
+            sys.exit("""Please specify a queue/partition name that is valid for your system.""")
     
         wall_time = None
-        if args.parallel_mode == PARALLEL_MODE_PBS and args.wall_time:
-            if args.wall_time < 1 or args.wall_time > 168:
-                sys.exit("Wall time must be greater than 0 and less than 169 hours")
+        if args.wall_time:
+            if args.parallel_mode == PARALLEL_MODE_PBS or args.parallel_mode == PARALLEL_MODE_SLURM:
+                if args.wall_time < 1 or args.wall_time > 168:
+                    sys.exit("Wall time must be greater than 0 and less than 169 hours")
             wall_time = args.wall_time
         
         if not os.path.isdir(args.basedir) or not os.access(args.basedir, os.W_OK):
