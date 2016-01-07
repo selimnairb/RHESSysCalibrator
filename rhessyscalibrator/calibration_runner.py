@@ -828,11 +828,11 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
         os.chmod(script_filename, 
                  stat.S_IWUSR | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         
-        # Build qsub command line
+        # Build sbatch command line
         stdout_file = os.path.abspath(os.path.join(self.run_path, 
-                                                   job.output_path, 'pbs.out'))
+                                                   job.output_path, 'sbatch.out'))
         stderr_file = os.path.abspath(os.path.join(self.run_path,
-                                                   job.output_path, 'pbs.err'))
+                                                   job.output_path, 'sbatch.err'))
         sbatch_cmd = self.run_cmd
         sbatch_cmd += ' -o ' + stdout_file + ' -e ' + stderr_file
         sbatch_cmd += ' ' + script_filename
