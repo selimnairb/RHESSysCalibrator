@@ -789,7 +789,7 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
                  db_path, run_path, logger, restart_runs,
                  submit_queue, polling_delay, mem_limit, max_active_jobs,
                  wall_time):
-        super(CalibrationRunnerPBS, self).__init__(basedir, session_id, queue, 
+        super(CalibrationRunnerSLURM, self).__init__(basedir, session_id, queue, 
                  db_path, run_path, logger, restart_runs,
                  submit_queue, polling_delay, mem_limit, max_active_jobs)
         
