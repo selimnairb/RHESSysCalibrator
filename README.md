@@ -8,7 +8,7 @@ distinct and uniformly random set of sensitiviy parameters.
 RHESSysCalibrator uses a database (in sqlite3 format) to keep track of each 
 session and run.  RHESSysCalibrator handles launching and management of each
 run, and will update its database as run jobs are submitted, begin
-running, and finish (either with or without error).  RHESSysCalibrator supports parallel execution of model runs using: (1) multiple processes (i.e. on your laptop or workstation); (2) compute clusters running Load Sharing Facility (LSF); and (3) compute clusters running PBS/TORQUE. 
+running, and finish (either with or without error).  RHESSysCalibrator supports parallel execution of model runs using: (1) multiple processes (i.e. on your laptop or workstation); (2) compute clusters running Load Sharing Facility (LSF); (3) compute clusters running PBS/TORQUE; and (4) compute clusters running SLURM. 
 
 In addition to creating new calibration sessions, it is also possible
 to re-start sessions that have exited before completion. RHESSysCalibrator also handles calibration post processing (i.e. calculating Nash-Sutcliffe efficiency for modeled vs. observed streamflow), as well as uncertainty estimation using Generalized Likelihood Uncertainty Estimation (GLUE; Beven & Binley 1992).
@@ -160,7 +160,11 @@ Or to run the session on a compute cluster running PBS/TORQUE:
 
 	rhessys_calibrator.py -b MY_CALIBRATION_PROJECT -p 'My RHESSys model' -n 'Debug calibration session, one iteration' -i 1 -j 1 --parallel_mode pbs --mem_limit N --wall_time M
 	
-Where *M* is the amount of hours you estimate that your model will need to complete. You may also optionally specify the *-q* option when running under PBS.
+Where *M* is the amount of hours you estimate that your model will need to complete. You may also optionally specify the *-q* option when running under PBS.  Similarly, to run the session on a compute cluster running SLURM:
+
+	rhessys_calibrator.py -b MY_CALIBRATION_PROJECT -p 'My RHESSys model' -n 'Debug calibration session, one iteration' -i 1 -j 1 --parallel_mode slurm --mem_limit N -q QUEUE_NAME
+	
+here, *Q* is the name of the SLURM partition to submit the job to.  You may also optionally specify the *--wall_time* option when running under SLURM.
 
 For details about these and other options, run *rhessys_calibrator* with the *--help* option:
 
@@ -190,6 +194,10 @@ or for PBS/TORQUE-based clusters:
 
     rhessys_calibrator.py -b MY_CALIBRATION_PROJECT -p 'My RHESSys model' -n 'Debug calibration session, one iteration' -i 5000 -j 1000 --parallel_mode pbs --mem_limit N --wall_time M
     
+or for SLURM-based clusters:
+
+    rhessys_calibrator.py -b MY_CALIBRATION_PROJECT -p 'My RHESSys model' -n 'Debug calibration session, one iteration' -i 5000 -j 1000 --parallel_mode slurm --mem_limit N --wall_time M
+    
 Here we are telling RHESSysCalibrator to run 5,000 model iterations in this session with at most 1,000 simultaneous jobs.  Note that the number of simultaneous jobs possible will depend on the size of the compute cluster (e.g. number of cores) as well as administrative policies.  For example, some systems restrict users to using at most a few hundred compute cores at any one time and may impose aggregate memory limits across all of your jobs, for example a few terabytes (TB).  Consult the documentation for your cluster before trying to run more than a few simultaneous jobs using RHESSysCalibrator.
 
 ### Using screen to run RHESSysCalibrator on compute clusters
@@ -212,6 +220,10 @@ On occasion, the *rhessys_calibrator* session may be forceably stopped before al
 or for PBS/TORQUE-based clusters:
 
     rhessys_calibrator_restart.py -b MY_CALIBRATION_PROJECT -s N -i 5000 -j 1000 --parallel_mode pbs --mem_limit M --wall_time W  
+    
+or for SLURM-based clusters:
+
+	rhessys_calibrator_restart.py -b MY_CALIBRATION_PROJECT -s N -i 5000 -j 1000 --parallel_mode slurm --mem_limit M --wall_time W
     
 Where the *-s* option is used to specify the ID of the session that you would like to restart.  Will print how many runs have completed, how many will be restarted, and how many new runs will be started, before asking you if you wish to continue.
 
@@ -262,6 +274,10 @@ The following invocation of *rhessys_calibrator_behavioral* will apply the top 1
 or for PBS/TORQUE-based clusters:
 
     rhessys_calibrator_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -p 'Behavioral runs for My RHESSys model' -s 2 -c cmd.proto -j 100 --parallel_mode pbs --mem_limit M --wall_time W -f "postprocess_id=2 order by nse_log desc, nse desc limit 100"
+    
+or for SLURM-based clusters:
+
+    rhessys_calibrator_behavioral.py -b MY_BEHAVIORAL_CALIBRATION_PROJECT -p 'Behavioral runs for My RHESSys model' -s 2 -c cmd.proto -j 100 --parallel_mode slurm --mem_limit M --wall_time W -f "postprocess_id=2 order by nse_log desc, nse desc limit 100"
     
 Note that to allow the time period for uncertainty estimation of behavioral simulations to differ from that of the calibration session, we can specify a particular *cmd.proto* to use, which may or may not be the same as the *cmd.proto* used for the calibration session.
 
