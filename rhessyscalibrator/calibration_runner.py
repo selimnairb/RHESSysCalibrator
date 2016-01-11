@@ -759,7 +759,7 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
         
             @return String representing job status command
         """
-        return "squeue"
+        return "squeue -t all"
     
     def getRunCmdRegex(self):
         """ Get compiled regular expression for parsing run command output
