@@ -8,7 +8,7 @@ management.
 This software is provided free of charge under the New BSD License. Please see
 the following license information:
 
-Copyright (c) 2013-2015, University of North Carolina at Chapel Hill
+Copyright (c) 2013-2016, University of North Carolina at Chapel Hill
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -120,7 +120,7 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
 
         parser.add_argument("--wall_time", action="store",
                             type=int, dest="wall_time",
-                            help="For PBS-based parallel mode: Specify wall time in hours that jobs should take.")
+                            help="For PBS- and SLURM-based parallel mode: Specify wall time in hours that jobs should take.")
 
         parser.add_argument("-l", "--loglevel", action="store",
                           dest="loglevel", default="OFF", choices=['OFF', 'DEBUG', 'CRITICAL'], required=False,
@@ -137,12 +137,13 @@ class RHESSysCalibratorBehavioral(RHESSysCalibrator):
             self._initLogger(logging.NOTSET)
          
         if options.parallel_mode != calibrator.PARALLEL_MODE_PROCESS and not options.queue_name:
-            sys.exit("""Please specify a queue name that is valid for your system.""")
+            sys.exit("""Please specify a queue/partition name that is valid for your system.""")
             
         wall_time = None
-        if options.parallel_mode == calibrator.PARALLEL_MODE_PBS and options.wall_time:
-            if options.wall_time < 1 or options.wall_time > 168:
-                sys.exit("Wall time must be greater than 0 and less than 169 hours")
+        if options.wall_time:
+            if options.parallel_mode == calibrator.PARALLEL_MODE_PBS or options.parallel_mode == calibrator.PARALLEL_MODE_SLURM:
+                if options.wall_time < 1 or options.wall_time > 168:
+                    sys.exit("Wall time must be greater than 0 and less than 169 hours")
             wall_time = options.wall_time
             
         if not os.path.isdir(options.basedir) or not os.access(options.basedir, os.R_OK):
