@@ -821,7 +821,7 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
             script.write("#SBATCH --mem-per-cpu={mem_limit}\n".format(mem_limit=(self.mem_limit*1024)))
         if self.wall_time:
             script.write("#SBATCH --time={0}:00:00\n".format(self.wall_time)) # Try to get by without specifying this
-        script.write("\nsrun {cmd}\n".format(job.cmd_raw))
+        script.write("\nsrun {cmd}\n".format(cmd=job.cmd_raw))
         script.close()
         os.chmod(script_filename, 
                  stat.S_IWUSR | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
