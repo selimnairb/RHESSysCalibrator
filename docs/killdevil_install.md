@@ -25,11 +25,34 @@ You'll need to do this last part every time you log in.
 
 Download RHESSysCalibrator from GitHub:
 
-    git clone https://github.com/selimnairb/RHESSysCalibrator.git 
+    git clone https://github.com/selimnairb/RHESSysCalibrator.git
+    cd RHESSysCalibrator
 
+Edit *install_requires* in setup.py to remove dependencies not needed on the cluster.  Initial 
+value:
+
+```
+install_requires=['numpy>=1.7',
+                        'scipy',
+                        'matplotlib>=1.1',
+                        'pandas',
+                        'rhessysworkflows>=1.21'
+      ],
+```
+
+Commented out value:
+
+```
+      install_requires=['numpy>=1.7',
+                        'scipy',
+#                        'matplotlib>=1.1',
+#                        'pandas',
+                        'rhessysworkflows>=1.21'
+      ],
+```
+    
 Install:
 
-    cd RHESSysCalibrator
     python setup.py install
     cd ..
 
