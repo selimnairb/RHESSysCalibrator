@@ -810,7 +810,7 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
         """
         # Make script for running this model run
         script_filename = os.path.abspath(os.path.join(self.run_path, 
-                                                       job.output_path, 'pbs.script'))
+                                                       job.output_path, 'slurm.script'))
         script = open(script_filename, 'w')
         script.write('#!/bin/sh\n\n')
         script.write('#SBATCH --job-name=RHESSysCalibrator\n')
