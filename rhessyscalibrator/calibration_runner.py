@@ -813,10 +813,10 @@ class CalibrationRunnerSLURM(CalibrationRunnerQueue):
                                                        job.output_path, 'pbs.script'))
         script = open(script_filename, 'w')
         script.write('#!/bin/sh\n\n')
-        script.write('#SBATCH --job-name=RHESSysCalibrator')
+        script.write('#SBATCH --job-name=RHESSysCalibrator\n')
         script.write('#SBATCH --nodes 1-1\n')
-        script.write('#SBATCH -n 1')
-        script.write("#SBATCH --partition {partition}".format(partition=self.submit_queue))
+        script.write('#SBATCH -n 1\n')
+        script.write("#SBATCH --partition {partition}\n".format(partition=self.submit_queue))
         if self.mem_limit:
             script.write("#SBATCH --mem-per-cpu={mem_limit}\n".format(mem_limit=(self.mem_limit*1024)))
         if self.wall_time:
